@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>计划书助手 · 保诚储蓄</title>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+  :root{
+    --pr: #e60012;            /* 保诚红 */
+    --pr-dark: #c00010;
+    --ink: #222;
+    --gray: #888;
+    --line: #eee;
+    --bg: #f5f6f8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--ink);}
+  header{background:#fff;padding:14px 22px;display:flex;align-items:center;gap:10px;
+         border-bottom:1px solid var(--line);}
+  header .logo{font-size:18px;font-weight:700;color:var(--pr);}
+  header .sub{font-size:12px;color:var(--gray);}
+  .wrap{max-width:760px;margin:20px auto;padding:0 16px;}
+
+  /* 上传区 */
+  .drop{border:2px dashed #cfd3da;border-radius:12px;background:#fff;padding:40px 20px;
+        text-align:center;color:var(--gray);cursor:pointer;transition:.2s;}
+  .drop:hover,.drop.over{border-color:var(--pr);color:var(--pr);background:#fff5f6;}
+  .drop b{color:var(--ink);}
+  .hint{font-size:12px;margin-top:10px;color:#aaa;}
+
+  /* 工具栏 */
+  .toolbar{display:none;gap:10px;margin:16px 0;flex-wrap:wrap;}
+  .btn{border:none;border-radius:8px;padding:9px 16px;font-size:14px;cursor:pointer;}
+  .btn-primary{background:var(--pr);color:#fff;}
+  .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--line);}
+  .btn:hover{opacity:.9;}
+  .status{font-size:13px;color:var(--gray);}
+  .warn{background:#fff7e6;border:1px solid #ffd591;color:#ad6800;padding:8px 12px;
+        border-radius:8px;font-size:13px;margin:10px 0;display:none;}
+
+  /* 长图 */
+  #card{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.06);}
+  .banner{background:linear-gradient(135deg,#ff3b30,var(--pr));color:#fff;text-align:center;
+          padding:18px;font-size:20px;font-weight:700;letter-spacing:1px;}
+  .sec{padding:14px 18px;}
+  .sec-title{background:linear-gradient(90deg,#ff5a52,#ff8a80);color:#fff;font-weight:700;
+             padding:7px 12px;border-radius:6px;font-size:15px;margin-bottom:10px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  .invest th{background:#fdecec;color:var(--pr);font-weight:600;}
+  .invest th,.invest td{border:1px solid #f6d6d9;padding:9px 6px;text-align:center;}
+  .cv th{background:var(--pr);color:#fff;font-weight:600;}
+  .cv td{border:1px solid var(--line);padding:7px 6px;text-align:center;}
+  .cv tr:nth-child(even) td{background:#fafafa;}
+  .cv td.num{font-variant-numeric:tabular-nums;}
+  .foot{padding:12px 18px 18px;}
+  .foot .src{font-size:11px;color:#bbb;margin-bottom:8px;}
+  .foot .disc{font-size:11px;color:#bbb;text-align:center;}
+  .narr{background:#fdecec;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.7;color:#444;}
+  .narr b{color:var(--pr);}
+
+  /* PPT 风格提取区 */
+  .w-sub{font-size:13px;color:#666;margin-bottom:6px;}
+  .w-big{font-size:21px;font-weight:700;color:var(--ink);margin:4px 0;}
+  .w-big b,.w-bold b{color:var(--pr);}
+  .w-small{font-size:12px;color:#999;margin-bottom:10px;}
+  .w-bold{font-size:16px;font-weight:700;color:var(--ink);margin:8px 0;}
+  .divider{height:2px;background:#eee;margin:14px 0;}
+  .w-table th{background:var(--pr);color:#fff;font-weight:600;}
+  .w-table td{border:1px solid var(--line);padding:8px 6px;text-align:center;font-variant-numeric:tabular-nums;}
+  .w-table tr:nth-child(even) td{background:#fafafa;}
+  .w-table tr.age-row td{background:#fff3e0 !important;color:#c65900;font-weight:600;}
+  .w-rate{font-size:11px;color:#bbb;text-align:right;margin-top:8px;}
+
+  /* 摘要编辑 */
+  .summary-box{margin-top:16px;background:#fff;border-radius:12px;padding:14px;}
+  .summary-box h3{font-size:14px;margin-bottom:8px;}
+  textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:8px;
+           padding:10px;font-size:13px;line-height:1.6;font-family:inherit;resize:vertical;}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">计划书助手</span>
+  <span class="sub">保诚储蓄计划书解析 · 本地运行</span>
+</header>
+
+<div class="wrap">
+  <div class="drop" id="drop">
+    <div style="font-size:30px;">⬆</div>
+    <div><b>点击添加</b> 或拖入计划书 PDF（可一份份加）</div>
+    <div class="hint">支持 PRMESP 世誉财富 / TRST 信守明天 · 数字版 PDF</div>
+    <button class="btn btn-primary" id="btnAdd" style="margin-top:12px;">＋ 添加PDF</button>
+  </div>
+  <input type="file" id="file" accept=".pdf" multiple hidden>
+
+  <div id="fileList" style="display:none;margin:10px 0;"></div>
+  <div id="groupSel" style="display:none;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap;"></div>
+  <style>.gbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;} .gbtn.on{background:var(--pr);color:#fff;border-color:var(--pr);}</style>
+  <div style="display:flex;gap:10px;align-items:center;margin:10px 0;">
+    <button class="btn btn-primary" id="btnGo" style="display:none;">开始解析</button>
+    <span class="status" id="status2"></span>
+  </div>
+
+  <div style="margin:12px 0;font-size:13px;color:#666;display:flex;align-items:center;gap:8px;">
+    美元汇率（仅供参考）：
+    <input id="rate" type="number" value="6.8" step="0.1"
+           style="width:80px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;">
+    <span style="color:#bbb;">用于把美元换算成人民币展示</span>
+  </div>
+  <div class="warn" id="warn"></div>
+
+  <div class="toolbar" id="toolbar">
+    <button class="btn btn-primary" id="btnCopy">复制摘要</button>
+    <button class="btn btn-primary" id="btnImg">下载PPT</button>
+    <button class="btn btn-ghost" id="btnLong">下载长图</button>
+    <button class="btn btn-ghost" id="btnReset">换一份</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div id="card" style="display:none;"></div>
+
+  <div class="summary-box" id="summaryBox" style="display:none;">
+    <h3>计划书摘要（可编辑后复制发送）</h3>
+    <textarea id="summaryText"></textarea>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const drop = $('#drop'), fileInput = $('#file'), card = $('#card');
+
+drop.onclick = () => fileInput.click();
+$('#btnAdd').onclick = (e) => {
+  e.stopPropagation();
+  // 如果已有解析结果，自动清空，让用户从头开始
+  if (card.innerHTML.trim()) {
+    pending = [];
+    card.innerHTML = '';
+    $('#fileList').style.display = 'none';
+    $('#btnGo').style.display = 'none';
+    $('#drop').style.display = '';
+  }
+  fileInput.click();
+};
+
+// 待解析文件列表
+let pending = [];
+function renderPending(){
+  const box = $('#fileList');
+  if(!pending.length){ box.style.display='none'; $('#btnGo').style.display='none'; return; }
+  box.style.display='block';
+  $('#btnGo').style.display='inline-block';
+  box.innerHTML = pending.map((f,i)=>
+    `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;">
+       <span style="color:var(--pr);font-weight:700;">PDF</span>
+       <span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.name}</span>
+       <button data-i="${i}" class="rm" style="border:none;background:#f0f0f0;border-radius:6px;width:22px;height:22px;cursor:pointer;">×</button>
+     </div>`).join('');
+  box.querySelectorAll('.rm').forEach(b=> b.onclick = ()=>{ pending.splice(+b.dataset.i,1); renderPending(); });
+}
+fileInput.onchange = e => {
+  for(const f of e.target.files){ if(f.name.toLowerCase().endsWith('.pdf')) pending.push(f); }
+  e.target.value = '';
+  renderPending();
+};
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => {e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop', e => { e.preventDefault(); for(const f of e.dataTransfer.files) if(f.name.toLowerCase().endsWith('.pdf')) pending.push(f); renderPending(); });
+$('#btnGo').onclick = () => { if(pending.length) uploadAll(pending); };
+
+function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+
+// 已解析的同组方案：{base, variants:[...]}
+let combo = null;
+
+async function parseOne(f){
+  const fd = new FormData(); fd.append('file', f);
+  const res = await fetch('/api/parse', {method:'POST', body:fd});
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.detail || f.name+' 解析失败');
+  data._fname = f.name;
+  return data;
+}
+
+function baseKey(d){
+  const b = d.basic||{};
+  return [d.product_code, b.anb_age, b.gender, b.total_premium].join('|');
+}
+
+async function uploadAll(fileList){
+  $('#status2').textContent = '正在解析 '+fileList.length+' 份 PDF…';
+  $('#toolbar').style.display='flex';
+  const files = Array.from(fileList);
+  try{
+    const parsed = [];
+    for(const f of files){ parsed.push(await parseOne(f)); }
+    // 按投入方案分组
+    const groups = {};
+    parsed.forEach(d => { const k = baseKey(d); (groups[k] = groups[k]||[]).push(d); });
+    const keys = Object.keys(groups);
+    // 给每组加标签
+    const allGroups = keys.map(k=>{
+      const variants = groups[k];
+      variants.forEach(v=>{
+        const w = v.withdrawal||{};
+        v.variant_label = (variants.length>1) ? (v._fname.replace(/\.[^.]+$/,'').slice(0,18)) : (w.start_year?`第${w.start_year}年起提取`:null);
+      });
+      const b = variants[0].basic||{};
+      const label = variants[0].product_name.replace(/保险计划/g,'') + ` ${b.anb_age}岁 ${(b.total_premium/10000).toFixed(0)}万`;
+      return { label, variants };
+    });
+    window.allGroups = allGroups;
+    // 渲染组切换条
+    const sel = $('#groupSel');
+    if(allGroups.length > 1){
+      sel.style.display='flex';
+      sel.innerHTML = '<span style="font-size:12px;color:#888;align-self:center;">切换方案：</span>' +
+        allGroups.map((g,i)=>`<button data-g="${i}" class="gbtn ${i===0?'on':''}">${g.label}（${g.variants.length}份）</button>`).join('');
+      sel.querySelectorAll('.gbtn').forEach(b=> b.onclick=()=>{
+        sel.querySelectorAll('.gbtn').forEach(x=>x.classList.remove('on'));
+        b.classList.add('on');
+        setGroup(+b.dataset.g);
+      });
+      $('#status2').textContent = `识别到 ${allGroups.length} 个不同投入方案，点上面切换`;
+    } else {
+      sel.style.display='none';
+      $('#status2').textContent = '';
+    }
+    setGroup(0);
+  }catch(err){
+    $('#status2').textContent = '';
+    const w = $('#warn'); w.style.display='block'; w.textContent = '⚠ ' + err.message;
+  }
+}
+
+function setGroup(i){
+  const g = window.allGroups[i];
+  combo = { base: g.variants[0], variants: g.variants };
+  render(g.variants[0], g.variants[0]._fname);
+}
+
+function pickRows(rows){
+  // 判断是否为断档表：岁数标记行不在最后一行才算（完整表最后一行也是101岁标记）
+  const lastYear = rows[rows.length-1].year;
+  const hasGapMarkers = rows.some(r => r.is_age_marker && r.year !== lastYear);
+  let out;
+  if (hasGapMarkers) {
+    // 断档表：30年前每5年，30年后只取岁数标记行
+    out = rows.filter(r => (r.is_age_marker && r.year > 30)
+           || (!r.is_age_marker && r.year <= 30 && r.year % 5 === 0));
+  } else {
+    // 完整年表：每5年一直取到最后
+    out = rows.filter(r => r.year % 5 === 0);
+  }
+  const last = rows[rows.length-1];
+  if (last && !out.find(r=>r.year===last.year)) out.push(last);
+  const seen = new Set();
+  return out.filter(r=>{ if(seen.has(r.year)) return false; seen.add(r.year); return true; })
+            .sort((a,b)=>a.year-b.year);
+}
+
+let lastData = null;
+function render(data, fname){
+  lastData = data;
+  $('#warn').style.display = data.warning ? 'block':'none';
+  $('#warn').textContent = data.warning ? '⚠ '+data.warning : '';
+  $('#status').textContent = '解析完成';
+  $('#toolbar').style.display='flex';
+  const b = data.basic;
+  const cur = b.currency || '美元';
+  const rate = parseFloat($('#rate').value) || 6.8;
+  const rows = pickRows(data.rows);
+  const lastYr = rows.length ? rows[rows.length-1].year : null;
+  // 直接舍去（不四舍五入）：万为单位保留1位小数；加1e-9避免浮点误差多砍一位
+  const wU = v => (Math.floor(v/1000 + 1e-9)/10).toFixed(1)+'万';
+  const wR = v => '约'+Math.floor(v*rate/10000 + 1e-9)+'万';
+  // 自动判断：前25年里有多少个非年龄标记的年度行；>=10说明是完整年度表，按年份显示；否则按岁数显示
+  const yrSet = new Set(data.rows.filter(r=>!r.is_age_marker).map(r=>r.year));
+  let annualCount = 0;
+  for (let y=1; y<=25; y++) if (yrSet.has(y)) annualCount++;
+  const useYearLabel = annualCount >= 10;
+  const ylab = r => {
+    if (r.is_age_marker) return `${r.age}岁`;
+    return `第${r.year}年`;
+  };
+
+  const investRow = `
+    <tr><td>${b.anb_age}岁/${b.gender||''}</td>
+        <td>${b.premium_type}${b.pay_years>1?('·'+b.pay_years+'年'):''}</td>
+        <td>${b.annual_premium?fmt(b.annual_premium):'-'}</td>
+        <td>${b.total_premium?fmt(b.total_premium):'-'}</td></tr>`;
+
+  // 正常预期退保价值表（PPT：年度|美元|人民币）
+  const rowCls = r => r.is_age_marker ? ' class="age-row"' : '';
+  const normalHtml = rows.map(r=>
+    `<tr${rowCls(r)}><td>${ylab(r)}</td><td>${wU(r.surrender)}</td><td>${wR(r.surrender)}</td></tr>`).join('');
+
+  // 乐观预期退保价值表（仅 PRMESP 有）
+  const hasOpt = data.optimistic && Object.keys(data.optimistic).length > 0;
+  let optSection = '';
+  if (hasOpt) {
+    const optHtml = rows.map(r=>{
+      const o = data.optimistic[r.year];
+      const optVal = o ? o.optimistic : r.surrender;  // 25年后两情景趋同，取正常价值
+      return `<tr${rowCls(r)}><td>${ylab(r)}</td><td>${wU(optVal)}</td><td>${wR(optVal)}</td></tr>`;
+    }).join('');
+    optSection = `
+    <div class="sec">
+      <div class="sec-title">退保价值（乐观预期）</div>
+      <div class="w-small" style="margin-bottom:8px;">（投资回报比现时预期每年上升约1.2%；长远受每年6.5%客户总内部回报率规限，乐观与正常情景趋于一致）</div>
+      <table class="w-table"><tr><th>保单年度</th><th>${cur}</th><th>人民币（约）</th></tr>${optHtml}</table>
+    </div>`;
+  }
+
+  // 保证收益 vs 非保证收益表（始终显示）
+  const gHtml = rows.map(r=>
+    `<tr${rowCls(r)}><td>${ylab(r)}</td><td>${wU(r.guaranteed)}</td><td>${wR(r.guaranteed)}</td><td>${wU(r.bonus)}</td><td>${wR(r.bonus)}</td></tr>`).join('');
+  const gSection = `
+    <div class="sec">
+      <div class="sec-title">保证收益 vs 非保证收益</div>
+      <div class="w-small" style="margin-bottom:8px;">保证现金价值无论市场表现如何均确定可获；非保证为保险公司宣布的终期红利，可能调整。</div>
+      <table class="w-table">
+        <tr><th rowspan="2">保单年度</th><th colspan="2">保证收益</th><th colspan="2">非保证收益</th></tr>
+        <tr><th>${cur}</th><th>人民币（约）</th><th>${cur}</th><th>人民币（约）</th></tr>
+        ${gHtml}
+      </table>
+    </div>`;
+
+  // 提取安排区（世誉财富PPT话术风格）—— 可对每个提取方案各渲染一段
+  function wSectionHtml(v, label){
+    const w = v.withdrawal;
+    if (!w || !w.start_year) return '';
+    const vcur = v.basic.currency || cur;
+    const wrows = w.rows.filter(r => r.withdrawal > 0);
+    const nYears = wrows.length;
+    const wlast = wrows[wrows.length-1];
+    const annual = w.annual_withdrawal;
+    const total = wlast.accumulated;
+    const wan = x => (Math.floor(x/1000 + 1e-9)/10).toFixed(1) + '万';
+    const keyRows = wrows.filter((r,i) => i===0 || i===wrows.length-1 || r.year % 5 === 0);
+    const kHtml = keyRows.map(r =>
+      `<tr><td>第${r.year}年${r.year===wlast.year?(`（${r.age}岁）`):''}</td>
+        <td>${wan(r.surrender)}</td>
+        <td>${Math.floor(r.surrender*rate/10000 + 1e-9)}万</td></tr>`).join('');
+    return `
+    <div class="sec">
+      <div class="sec-title">建议提取方案${label?`（${label}）`:''}</div>
+      <div class="w-sub">从第${w.start_year}年开始提取，共提取 ${nYears} 年</div>
+      <div class="w-big">每年领取 <b>${fmt(annual)}</b> ${vcur}</div>
+      <div class="w-small">（每年约 ${Math.floor(annual*rate/1000 + 1e-9)/10}万人民币，每月约 ${Math.floor(annual*rate/10000/12*100 + 1e-9)/100}万人民币）</div>
+      <div class="w-bold">${nYears} 年总共领取 <b>${wan(total)}</b>（约 ${Math.floor(total*rate/10000 + 1e-9)}万人民币）</div>
+      <div class="divider"></div>
+      <div class="w-big">提取后账户剩余的总现金价值</div>
+      <table class="w-table" style="margin-top:10px;">
+        <tr><th>保单年度</th><th>${vcur}（剩余价值）</th><th>人民币（约）</th></tr>
+        ${kHtml}
+      </table>
+      <div class="narr" style="margin-top:10px;">
+        领完一辈子，账户还剩近 <b>${Math.floor(wlast.surrender/1000 + 1e-9)/10}万</b>（约 ${Math.floor(wlast.surrender*rate/10000 + 1e-9)}万人民币）继续传承给下一代。
+      </div>
+      <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
+    </div>`;
+  }
+  // 同组有多个提取方案时全部列出
+  const variants = (combo && combo.variants.length>1) ? combo.variants : [data];
+  const wSection = variants.map(v => wSectionHtml(v, v.variant_label)).join('');
+
+  card.innerHTML = `
+    <div class="banner">${data.product_name}</div>
+    <div class="sec">
+      <div class="sec-title">投入方案</div>
+      <table class="invest">
+        <tr><th>年龄/性别</th><th>缴费年期</th><th>每年保费（${cur}）</th><th>总保费（${cur}）</th></tr>
+        ${investRow}
+      </table>
+    </div>
+    <div class="sec">
+      <div class="sec-title">退保价值（正常预期）</div>
+      <table class="w-table">
+        <tr><th>保单年度</th><th>${cur}</th><th>人民币（约）</th></tr>
+        ${normalHtml}
+      </table>
+      <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
+    </div>
+    ${optSection}
+    ${gSection}
+    ${wSection}
+    <div class="foot">
+      <div class="src">来源：${fname}</div>
+      <div class="disc">*内容及数字仅做参考 以合约为准 · 非保证利益可能调整</div>
+    </div>`;
+  card.style.display='block';
+
+  // 摘要文字
+  const last = rows[rows.length-1];
+  const y10 = rows.find(r=>r.year===10), y20 = rows.find(r=>r.year===20);
+  let summary = `这份${data.product_name}（${data.product_code}）计划书的受保人为${b.anb_age}岁${b.gender||''}性（${b.smoker||''}），采用${cur}保单。`+
+    `${b.premium_type}保费${fmt(b.annual_premium)}${b.pay_years>1?('，共'+b.pay_years+'期'):''}，合计保费${fmt(b.total_premium)}${cur}。`;
+  const w = data.withdrawal;
+  if (w) {
+    const wlast = w.rows[w.rows.length-1];
+    summary += `按本方案，从第${w.start_year}年起每年提取${fmt(w.annual_withdrawal)}${cur}，累计提取${fmt(wlast.accumulated)}${cur}；至${wlast.age}岁提取后预计退保价值${fmt(wlast.surrender)}${cur}。`;
+  } else {
+    summary += (y10?`第10个保单年度（${y10.age}岁）预计退保价值${fmt(y10.surrender)}${cur}；`:'')+
+    (y20?`第20个保单年度（${y20.age}岁）预计退保价值${fmt(y20.surrender)}${cur}；`:'')+
+    (last?`至${last.age}岁预计退保价值${fmt(last.surrender)}${cur}。`:'');
+  }
+  summary += `以上金额按计划书列示，非保证利益可能调整，以正式计划书及条款为准。`;
+  $('#summaryText').value = summary;
+  $('#summaryBox').style.display='block';
+}
+
+$('#btnCopy').onclick = async () => {
+  await navigator.clipboard.writeText($('#summaryText').value);
+  $('#status').textContent = '摘要已复制 ✓';
+};
+$('#btnImg').onclick = async () => {
+  if (!lastData) return;
+  $('#status').textContent = '正在生成PPT…';
+  const rate = parseFloat($('#rate').value) || 6.8;
+  const multi = combo && combo.variants.length > 1;
+  const url = multi ? '/api/export-combined-ppt' : '/api/export-ppt';
+  const body = multi
+    ? { base: combo.base, variants: combo.variants, rate }
+    : { ...lastData, rate };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) { $('#status').textContent = '导出失败'; return; }
+  const blob = await res.blob();
+  const b = lastData.basic || {};
+  const prod = (lastData.product_name || '计划书').replace(/保险计划/g,'').replace(/\s/g,'');
+  const prem = ((b.total_premium||0)/10000).toFixed(1).replace(/\.0$/,'');
+  const sug = multi ? `${prod}_${b.anb_age||''}岁_${prem}万_多方案.pptx` : `${prod}_${b.anb_age||''}岁_${prem}万.pptx`;
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: sug,
+        types: [{ description: 'PowerPoint', accept: {'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx']} }]
+      });
+      const w = await handle.createWritable();
+      await w.write(blob); await w.close();
+      $('#status').textContent = '已保存到你选的位置 ✓';
+      return;
+    } catch(e) {
+      if (e.name === 'AbortError') { $('#status').textContent = '已取消保存'; return; }
+    }
+  }
+  const a = document.createElement('a');
+  a.download = sug;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  $('#status').textContent = 'PPT已下载 ✓';
+};
+$('#btnLong').onclick = async () => {
+  if (!lastData) return;
+  $('#status').textContent = '正在生成长图…';
+  try {
+    const c = await html2canvas(card, {backgroundColor:'#ffffff', scale:2});
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    const b = lastData.basic || {};
+    const prod = (lastData.product_name || '计划书').replace(/保险计划/g,'').replace(/\s/g,'');
+    const prem = ((b.total_premium||0)/10000).toFixed(1).replace(/\.0$/,'');
+    const sug = `${prod}_${b.anb_age||''}岁_${prem}万_长图.png`;
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: sug,
+          types: [{ description: 'PNG 图片', accept: {'image/png': ['.png']} }]
+        });
+        const w = await handle.createWritable();
+        await w.write(blob); await w.close();
+        $('#status').textContent = '长图已保存到你选的位置 ✓';
+        return;
+      } catch(e) {
+        if (e.name === 'AbortError') { $('#status').textContent = '已取消保存'; return; }
+      }
+    }
+    const a = document.createElement('a');
+    a.download = sug;
+    a.href = URL.createObjectURL(blob);
+    a.click();
+    $('#status').textContent = '长图已下载 ✓';
+  } catch(e){ $('#status').textContent = '长图生成失败'; }
+};
+$('#btnReset').onclick = () => location.reload();
+</script>
+</body>
+</html>
