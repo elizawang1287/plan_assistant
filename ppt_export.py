@@ -181,30 +181,30 @@ def add_base_slides(prs, blank, data, rate=6.8):
 
 
 def add_withdrawal_slide(prs, blank, data, rate=6.8, label=None):
-    “””提取方案页。label 用于多方案时区分（如”第6年起提取”）。”””
-    w = data.get(“withdrawal”)
-    if not w or not w.get(“start_year”):
+    """提取方案页。label 用于多方案时区分（如第6年起提取）。"""
+    w = data.get("withdrawal")
+    if not w or not w.get("start_year"):
         return
     cl = _cl(data)
-    cur = data[“basic”].get(“currency”, “美元”)
+    cur = data["basic"].get("currency", "美元")
     slide = prs.slides.add_slide(blank)
-    wrows = [x for x in w[“rows”] if x[“withdrawal”] > 0]
+    wrows = [x for x in w["rows"] if x["withdrawal"] > 0]
     n_years = len(wrows)
     wlast = wrows[-1]
-    annual = w[“annual_withdrawal”]
-    total = wlast[“accumulated”]
-    _box(slide, “建议提取方案” + (f”（{label}）” if label else “”), 0.59, 0.30, 7.08, size=18, bold=True)
-    _box(slide, f”从第 {w['start_year']} 年开始提取，共提取 {n_years} 年”, 0.59, 0.80, 7.08, size=12)
-    _box(slide, f”每年领取 {annual:,.0f} {cur}”, 0.59, 1.15, 7.08, size=16, bold=True)
-    _box(slide, f”（每年约 {int(annual*rate//1000 + 1e-9)/10:.1f} 万{cl}，每月约 {int(annual*rate//10000/12*100 + 1e-9)/100:.2f} 万{cl}）”, 0.44, 1.55, 7.08, size=10, color=GRAY)
-    _box(slide, f”{n_years} 年总共领取 {int(total//1000 + 1e-9)/10:.1f} 万{cur}（约 {int(total*rate//10000 + 1e-9)} 万{cl}）”, 0.59, 1.90, 7.08, size=13, bold=True)
-    _box(slide, “提取后账户剩余的总现金价值”, 0.59, 2.40, 7.08, size=14, bold=True)
-    key = [x for x in wrows if x[“year”] == w[“start_year”] or x[“year”] % 5 == 0 or x == wrows[-1]]
-    rem_rows = [[f”第 {x['year']} 年” + (f”（{x['age']}岁）” if x == wrows[-1] else “”),
-                 _wan(x[“surrender”]), _rmb(x[“surrender”], rate)] for x in key]
-    _build_table(slide, 2.85, [[“保单年度”, cur+”（剩余价值）”, f”{cl}（约）”]], rem_rows,
+    annual = w["annual_withdrawal"]
+    total = wlast["accumulated"]
+    _box(slide, "建议提取方案" + (f"（{label}）" if label else ""), 0.59, 0.30, 7.08, size=18, bold=True)
+    _box(slide, f"从第 {w['start_year']} 年开始提取，共提取 {n_years} 年", 0.59, 0.80, 7.08, size=12)
+    _box(slide, f"每年领取 {annual:,.0f} {cur}", 0.59, 1.15, 7.08, size=16, bold=True)
+    _box(slide, f"（每年约 {int(annual*rate//1000 + 1e-9)/10:.1f} 万{cl}，每月约 {int(annual*rate//10000/12*100 + 1e-9)/100:.2f} 万{cl}）", 0.44, 1.55, 7.08, size=10, color=GRAY)
+    _box(slide, f"{n_years} 年总共领取 {int(total//1000 + 1e-9)/10:.1f} 万{cur}（约 {int(total*rate//10000 + 1e-9)} 万{cl}）", 0.59, 1.90, 7.08, size=13, bold=True)
+    _box(slide, "提取后账户剩余的总现金价值", 0.59, 2.40, 7.08, size=14, bold=True)
+    key = [x for x in wrows if x["year"] == w["start_year"] or x["year"] % 5 == 0 or x == wrows[-1]]
+    rem_rows = [[f"第 {x['year']} 年" + (f"（{x['age']}岁）" if x == wrows[-1] else ""),
+                 _wan(x["surrender"]), _rmb(x["surrender"], rate)] for x in key]
+    _build_table(slide, 2.85, [["保单年度", cur+"（剩余价值）", f"{cl}（约）"]], rem_rows,
                  col_w=[2.62, 2.3, 2.3], row_h=0.48)
-    _box(slide, f”领完一辈子，账户还剩近 {int(wlast['surrender']//1000 + 1e-9)/10:.1f} 万 继续传承给下一代”, 0.59, 11.0, 7.08, size=11, color=GRAY)
+    _box(slide, f"领完一辈子，账户还剩近 {int(wlast['surrender']//1000 + 1e-9)/10:.1f} 万 继续传承给下一代", 0.59, 11.0, 7.08, size=11, color=GRAY)
     _footer(slide, rate, cl)
 
 
