@@ -100,17 +100,27 @@
   <div id="fileList" style="display:none;margin:10px 0;"></div>
   <div id="groupSel" style="display:none;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap;"></div>
   <style>.gbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;} .gbtn.on{background:var(--pr);color:#fff;border-color:var(--pr);}</style>
+
+  <div style="margin:12px 0;padding:12px;background:#fff;border:1px solid var(--line);border-radius:10px;">
+    <div style="font-size:13px;color:#666;margin-bottom:8px;">兑换币种（解析前先选好）</div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:4px;font-size:14px;cursor:pointer;">
+        <input type="radio" name="cur" value="RMB" checked> 美元→人民币
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:14px;cursor:pointer;">
+        <input type="radio" name="cur" value="HKD"> 美元→港币
+      </label>
+      <span style="color:#bbb;font-size:12px;">汇率：</span>
+      <input id="rate" type="number" value="6.8" step="0.1"
+             style="width:70px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;">
+    </div>
+  </div>
+
   <div style="display:flex;gap:10px;align-items:center;margin:10px 0;">
     <button class="btn btn-primary" id="btnGo" style="display:none;">开始解析</button>
     <span class="status" id="status2"></span>
   </div>
 
-  <div style="margin:12px 0;font-size:13px;color:#666;display:flex;align-items:center;gap:8px;">
-    美元汇率（仅供参考）：
-    <input id="rate" type="number" value="6.8" step="0.1"
-           style="width:80px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;">
-    <span style="color:#bbb;">用于把美元换算成人民币展示</span>
-  </div>
   <div class="warn" id="warn"></div>
 
   <div class="toolbar" id="toolbar">
@@ -171,6 +181,9 @@ fileInput.onchange = e => {
 ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {e.preventDefault();drop.classList.remove('over');}));
 drop.addEventListener('drop', e => { e.preventDefault(); for(const f of e.dataTransfer.files) if(f.name.toLowerCase().endsWith('.pdf')) pending.push(f); renderPending(); });
 $('#btnGo').onclick = () => { if(pending.length) uploadAll(pending); };
+document.querySelectorAll('input[name="cur"]').forEach(r => r.onchange = () => {
+  $('#rate').value = r.value === 'HKD' ? '7.8' : '6.8';
+});
 
 function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
 
@@ -273,6 +286,7 @@ function render(data, fname){
   const b = data.basic;
   const cur = b.currency || '美元';
   const rate = parseFloat($('#rate').value) || 6.8;
+  const curLabel = document.querySelector('input[name="cur"]:checked').value === 'HKD' ? '港币' : '人民币';
   const rows = pickRows(data.rows);
   const lastYr = rows.length ? rows[rows.length-1].year : null;
   // 直接舍去（不四舍五入）：万为单位保留1位小数；加1e-9避免浮点误差多砍一位
@@ -312,7 +326,7 @@ function render(data, fname){
     <div class="sec">
       <div class="sec-title">退保价值（乐观预期）</div>
       <div class="w-small" style="margin-bottom:8px;">（投资回报比现时预期每年上升约1.2%；长远受每年6.5%客户总内部回报率规限，乐观与正常情景趋于一致）</div>
-      <table class="w-table"><tr><th>保单年度</th><th>${cur}</th><th>人民币（约）</th></tr>${optHtml}</table>
+      <table class="w-table"><tr><th>保单年度</th><th>${cur}</th><th>${curLabel}（约）</th></tr>${optHtml}</table>
     </div>`;
   }
 
@@ -325,7 +339,7 @@ function render(data, fname){
       <div class="w-small" style="margin-bottom:8px;">保证现金价值无论市场表现如何均确定可获；非保证为保险公司宣布的终期红利，可能调整。</div>
       <table class="w-table">
         <tr><th rowspan="2">保单年度</th><th colspan="2">保证收益</th><th colspan="2">非保证收益</th></tr>
-        <tr><th>${cur}</th><th>人民币（约）</th><th>${cur}</th><th>人民币（约）</th></tr>
+        <tr><th>${cur}</th><th>${curLabel}（约）</th><th>${cur}</th><th>${curLabel}（约）</th></tr>
         ${gHtml}
       </table>
     </div>`;
@@ -351,16 +365,16 @@ function render(data, fname){
       <div class="sec-title">建议提取方案${label?`（${label}）`:''}</div>
       <div class="w-sub">从第${w.start_year}年开始提取，共提取 ${nYears} 年</div>
       <div class="w-big">每年领取 <b>${fmt(annual)}</b> ${vcur}</div>
-      <div class="w-small">（每年约 ${Math.floor(annual*rate/1000 + 1e-9)/10}万人民币，每月约 ${Math.floor(annual*rate/10000/12*100 + 1e-9)/100}万人民币）</div>
-      <div class="w-bold">${nYears} 年总共领取 <b>${wan(total)}</b>（约 ${Math.floor(total*rate/10000 + 1e-9)}万人民币）</div>
+      <div class="w-small">（每年约 ${Math.floor(annual*rate/1000 + 1e-9)/10}万${curLabel}，每月约 ${Math.floor(annual*rate/10000/12*100 + 1e-9)/100}万${curLabel}）</div>
+      <div class="w-bold">${nYears} 年总共领取 <b>${wan(total)}</b>（约 ${Math.floor(total*rate/10000 + 1e-9)}万${curLabel}）</div>
       <div class="divider"></div>
       <div class="w-big">提取后账户剩余的总现金价值</div>
       <table class="w-table" style="margin-top:10px;">
-        <tr><th>保单年度</th><th>${vcur}（剩余价值）</th><th>人民币（约）</th></tr>
+        <tr><th>保单年度</th><th>${vcur}（剩余价值）</th><th>${curLabel}（约）</th></tr>
         ${kHtml}
       </table>
       <div class="narr" style="margin-top:10px;">
-        领完一辈子，账户还剩近 <b>${Math.floor(wlast.surrender/1000 + 1e-9)/10}万</b>（约 ${Math.floor(wlast.surrender*rate/10000 + 1e-9)}万人民币）继续传承给下一代。
+        领完一辈子，账户还剩近 <b>${Math.floor(wlast.surrender/1000 + 1e-9)/10}万</b>（约 ${Math.floor(wlast.surrender*rate/10000 + 1e-9)}万${curLabel}）继续传承给下一代。
       </div>
       <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
     </div>`;
@@ -381,7 +395,7 @@ function render(data, fname){
     <div class="sec">
       <div class="sec-title">退保价值（正常预期）</div>
       <table class="w-table">
-        <tr><th>保单年度</th><th>${cur}</th><th>人民币（约）</th></tr>
+        <tr><th>保单年度</th><th>${cur}</th><th>${curLabel}（约）</th></tr>
         ${normalHtml}
       </table>
       <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
@@ -422,11 +436,12 @@ $('#btnImg').onclick = async () => {
   if (!lastData) return;
   $('#status').textContent = '正在生成PPT…';
   const rate = parseFloat($('#rate').value) || 6.8;
+  const curLabel = document.querySelector('input[name="cur"]:checked').value === 'HKD' ? '港币' : '人民币';
   const multi = combo && combo.variants.length > 1;
   const url = multi ? '/api/export-combined-ppt' : '/api/export-ppt';
   const body = multi
-    ? { base: combo.base, variants: combo.variants, rate }
-    : { ...lastData, rate };
+    ? { base: combo.base, variants: combo.variants, rate, curLabel }
+    : { ...lastData, rate, curLabel };
   const res = await fetch(url, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},

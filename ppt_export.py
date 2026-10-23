@@ -39,6 +39,10 @@ def _rmb(v, rate):
     return f"约 {int(v*rate//10000 + 1e-9)} 万"
 
 
+def _cl(data):
+    return data.get("curLabel", "人民币")
+
+
 def _style_cell(cell, text, bold=False, color=DARK, size=14, align=PP_ALIGN.CENTER, fill=None):
     cell.text = ""
     cell.vertical_anchor = MSO_ANCHOR.MIDDLE
@@ -68,11 +72,11 @@ def _box(slide, text, l, t, w, size=14, color=DARK, bold=False, align=PP_ALIGN.L
     return box
 
 
-def _footer(slide):
-    _box(slide, "美元汇率：6.8（仅供参考）", 5.1, 11.35, 2.8, size=9, color=GRAY, align=PP_ALIGN.RIGHT)
+def _footer(slide, rate=6.8, cl="人民币"):
+    _box(slide, f"美元汇率：{rate}（仅供参考）", 5.1, 11.35, 2.8, size=9, color=GRAY, align=PP_ALIGN.RIGHT)
 
 
-def _build_table(slide, top_in, headers, data_rows, col_w, row_h=0.62, two_row_header=False):
+def _build_table(slide, top_in, headers, data_rows, col_w, row_h=0.48, two_row_header=False):
     n_cols = len(headers[0])
     n_rows = len(data_rows) + (2 if two_row_header else 1)
     height = row_h * n_rows
@@ -86,22 +90,22 @@ def _build_table(slide, top_in, headers, data_rows, col_w, row_h=0.62, two_row_h
 
     if two_row_header:
         for j, h in enumerate(headers[0]):
-            _style_cell(tbl.cell(0, j), h or "", bold=True, color=WHITE, size=13, fill=RED)
+            _style_cell(tbl.cell(0, j), h or "", bold=True, color=WHITE, size=11, fill=RED)
         tbl.cell(0, 0).merge(tbl.cell(1, 0))
         tbl.cell(0, 1).merge(tbl.cell(0, 2))
         tbl.cell(0, 3).merge(tbl.cell(0, 4))
         for j, h in enumerate(headers[1]):
-            _style_cell(tbl.cell(1, j), h, bold=True, color=WHITE, size=12, fill=RED)
+            _style_cell(tbl.cell(1, j), h, bold=True, color=WHITE, size=10, fill=RED)
         start = 2
     else:
         for j, h in enumerate(headers[0]):
-            _style_cell(tbl.cell(0, j), h, bold=True, color=WHITE, size=14, fill=RED)
+            _style_cell(tbl.cell(0, j), h, bold=True, color=WHITE, size=11, fill=RED)
         start = 1
 
     for i, row in enumerate(data_rows):
         fill = LIGHT if (i % 2 == 0) else None
         for j, val in enumerate(row):
-            _style_cell(tbl.cell(start + i, j), val, size=13, fill=fill)
+            _style_cell(tbl.cell(start + i, j), val, size=10, fill=fill)
     return tbl_shape
 
 
@@ -127,6 +131,7 @@ def _ylab(r, last, use_year=True):
 def add_base_slides(prs, blank, data, rate=6.8):
     """投入方案 + 正常/乐观/保证 三张基础表。"""
     b = data["basic"]
+    cl = _cl(data)
     cur = b.get("currency", "美元")
     rows = pick_rows(data["rows"])
     last = rows[-1] if rows else None
@@ -135,15 +140,15 @@ def add_base_slides(prs, blank, data, rate=6.8):
 
     # 投入 + 正常预期
     slide = prs.slides.add_slide(blank)
-    _box(slide, data["product_name"], 0.71, 0.34, 6.85, size=24, bold=True)
-    _box(slide, f"趸交 {b.get('total_premium',0)/10000:.1f} 万 {cur}", 0.71, 0.91, 6.85, size=16)
-    _box(slide, f"{b.get('anb_age','')}岁{b.get('gender','')}性｜保单货币：{cur}", 0.71, 1.35, 6.85, size=12, color=GRAY)
-    _box(slide, "退保价值", 0.74, 1.85, 6.85, size=18, bold=True)
+    _box(slide, data["product_name"], 0.71, 0.30, 6.85, size=22, bold=True)
+    _box(slide, f"趸交 {b.get('total_premium',0)/10000:.1f} 万 {cur}", 0.71, 0.80, 6.85, size=14)
+    _box(slide, f"{b.get('anb_age','')}岁{b.get('gender','')}性｜保单货币：{cur}", 0.71, 1.18, 6.85, size=11, color=GRAY)
+    _box(slide, "退保价值", 0.74, 1.60, 6.85, size=16, bold=True)
     normal_rows = [[ylab(r), _wan(r["surrender"]), _rmb(r["surrender"], rate)] for r in rows]
-    _build_table(slide, 2.4, [["保单年度", cur, "人民币（约）"]], normal_rows,
-                 col_w=[2.62, 2.3, 2.3], row_h=0.62)
-    _box(slide, "剩余资金可一次性取出，或传承给下一代", 0.71, 10.95, 6.85, size=11, color=GRAY)
-    _footer(slide)
+    _build_table(slide, 2.05, [["保单年度", cur, f"{cl}（约）"]], normal_rows,
+                 col_w=[2.62, 2.3, 2.3], row_h=0.48)
+    _box(slide, "剩余资金可一次性取出，或传承给下一代", 0.71, 10.95, 6.85, size=10, color=GRAY)
+    _footer(slide, rate, cl)
 
     # 乐观预期
     has_opt = bool(data.get("optimistic"))
@@ -152,54 +157,55 @@ def add_base_slides(prs, blank, data, rate=6.8):
         return o.get("optimistic", r["surrender"])
     if has_opt:
         slide = prs.slides.add_slide(blank)
-        _box(slide, "退保价值", 0.72, 0.20, 6.85, size=24, bold=True)
-        _box(slide, "（投资回报比现时预期每年上升约 1.4%）", 0.72, 0.80, 6.85, size=12, color=GRAY)
+        _box(slide, "退保价值", 0.72, 0.20, 6.85, size=22, bold=True)
+        _box(slide, "（投资回报比现时预期每年上升约 1.4%）", 0.72, 0.72, 6.85, size=11, color=GRAY)
         opt_rows = [[ylab(r), _wan(opt_of(r)), _rmb(opt_of(r), rate)] for r in rows]
-        _build_table(slide, 1.5, [["保单年度", cur, "人民币（约）"]], opt_rows,
-                     col_w=[2.62, 2.3, 2.3], row_h=0.62)
-        _box(slide, "长远受每年 6.5% 客户总内部回报率规限，乐观与正常情景趋于一致", 0.67, 10.9, 6.85, size=11, color=GRAY)
-        _footer(slide)
+        _build_table(slide, 1.25, [["保单年度", cur, f"{cl}（约）"]], opt_rows,
+                     col_w=[2.62, 2.3, 2.3], row_h=0.48)
+        _box(slide, "长远受每年 6.5% 客户总内部回报率规限，乐观与正常情景趋于一致", 0.67, 10.9, 6.85, size=10, color=GRAY)
+        _footer(slide, rate, cl)
 
     # 保证 vs 非保证
     if has_opt:
         slide = prs.slides.add_slide(blank)
-        _box(slide, "保证收益 vs 非保证收益", 0.0, 0.22, 8.26, size=24, bold=True, align=PP_ALIGN.CENTER)
-        _box(slide, "保证现金价值（无论市场表现如何，这部分金额确定可获得）", 0.73, 1.0, 7.0, size=12, color=GRAY)
+        _box(slide, "保证收益 vs 非保证收益", 0.0, 0.20, 8.26, size=22, bold=True, align=PP_ALIGN.CENTER)
+        _box(slide, "保证现金价值（无论市场表现如何，这部分金额确定可获得）", 0.73, 0.85, 7.0, size=11, color=GRAY)
         g_rows = [[ylab(r), _wan(r["guaranteed"]), _rmb(r["guaranteed"], rate),
                    _wan(r["bonus"]), _rmb(r["bonus"], rate)] for r in rows]
-        _build_table(slide, 1.45,
+        _build_table(slide, 1.25,
                      [["保单年度", "保证收益", "", "非保证收益", ""],
-                      ["", cur, "人民币（约）", cur, "人民币（约）"]],
-                     g_rows, col_w=[1.62, 1.4, 1.4, 1.4, 1.4], row_h=0.6, two_row_header=True)
-        _box(slide, "保证收益为保险公司承诺的最低现金价值，不包含非保证红利与终期分红", 0.62, 11.0, 7.0, size=11, color=GRAY)
-        _footer(slide)
+                      ["", cur, f"{cl}（约）", cur, f"{cl}（约）"]],
+                     g_rows, col_w=[1.62, 1.4, 1.4, 1.4, 1.4], row_h=0.46, two_row_header=True)
+        _box(slide, "保证收益为保险公司承诺的最低现金价值，不包含非保证红利与终期分红", 0.62, 11.0, 7.0, size=10, color=GRAY)
+        _footer(slide, rate, cl)
 
 
 def add_withdrawal_slide(prs, blank, data, rate=6.8, label=None):
-    """提取方案页。label 用于多方案时区分（如“第6年起提取”）。"""
-    w = data.get("withdrawal")
-    if not w or not w.get("start_year"):
+    “””提取方案页。label 用于多方案时区分（如”第6年起提取”）。”””
+    w = data.get(“withdrawal”)
+    if not w or not w.get(“start_year”):
         return
-    cur = data["basic"].get("currency", "美元")
+    cl = _cl(data)
+    cur = data[“basic”].get(“currency”, “美元”)
     slide = prs.slides.add_slide(blank)
-    wrows = [x for x in w["rows"] if x["withdrawal"] > 0]
+    wrows = [x for x in w[“rows”] if x[“withdrawal”] > 0]
     n_years = len(wrows)
     wlast = wrows[-1]
-    annual = w["annual_withdrawal"]
-    total = wlast["accumulated"]
-    _box(slide, "建议提取方案" + (f"（{label}）" if label else ""), 0.59, 0.45, 7.08, size=20, bold=True)
-    _box(slide, f"从第 {w['start_year']} 年开始提取，共提取 {n_years} 年", 0.59, 1.0, 7.08, size=13)
-    _box(slide, f"每年领取 {annual:,.0f} {cur}", 0.59, 1.4, 7.08, size=18, bold=True)
-    _box(slide, f"（每年约 {int(annual*rate//1000 + 1e-9)/10:.1f} 万人民币，每月约 {int(annual*rate//10000/12*100 + 1e-9)/100:.2f} 万人民币）", 0.44, 1.85, 7.08, size=11, color=GRAY)
-    _box(slide, f"{n_years} 年总共领取 {int(total//1000 + 1e-9)/10:.1f} 万{cur}（约 {int(total*rate//10000 + 1e-9)} 万人民币）", 0.59, 2.25, 7.08, size=14, bold=True)
-    _box(slide, "提取后账户剩余的总现金价值", 0.59, 2.85, 7.08, size=16, bold=True)
-    key = [x for x in wrows if x["year"] == w["start_year"] or x["year"] % 5 == 0 or x == wrows[-1]]
-    rem_rows = [[f"第 {x['year']} 年" + (f"（{x['age']}岁）" if x == wrows[-1] else ""),
-                 _wan(x["surrender"]), _rmb(x["surrender"], rate)] for x in key]
-    _build_table(slide, 3.4, [["保单年度", cur+"（剩余价值）", "人民币（约）"]], rem_rows,
-                 col_w=[2.62, 2.3, 2.3], row_h=0.62)
-    _box(slide, f"领完一辈子，账户还剩近 {int(wlast['surrender']//1000 + 1e-9)/10:.1f} 万 继续传承给下一代", 0.59, 11.0, 7.08, size=12, color=GRAY)
-    _footer(slide)
+    annual = w[“annual_withdrawal”]
+    total = wlast[“accumulated”]
+    _box(slide, “建议提取方案” + (f”（{label}）” if label else “”), 0.59, 0.30, 7.08, size=18, bold=True)
+    _box(slide, f”从第 {w['start_year']} 年开始提取，共提取 {n_years} 年”, 0.59, 0.80, 7.08, size=12)
+    _box(slide, f”每年领取 {annual:,.0f} {cur}”, 0.59, 1.15, 7.08, size=16, bold=True)
+    _box(slide, f”（每年约 {int(annual*rate//1000 + 1e-9)/10:.1f} 万{cl}，每月约 {int(annual*rate//10000/12*100 + 1e-9)/100:.2f} 万{cl}）”, 0.44, 1.55, 7.08, size=10, color=GRAY)
+    _box(slide, f”{n_years} 年总共领取 {int(total//1000 + 1e-9)/10:.1f} 万{cur}（约 {int(total*rate//10000 + 1e-9)} 万{cl}）”, 0.59, 1.90, 7.08, size=13, bold=True)
+    _box(slide, “提取后账户剩余的总现金价值”, 0.59, 2.40, 7.08, size=14, bold=True)
+    key = [x for x in wrows if x[“year”] == w[“start_year”] or x[“year”] % 5 == 0 or x == wrows[-1]]
+    rem_rows = [[f”第 {x['year']} 年” + (f”（{x['age']}岁）” if x == wrows[-1] else “”),
+                 _wan(x[“surrender”]), _rmb(x[“surrender”], rate)] for x in key]
+    _build_table(slide, 2.85, [[“保单年度”, cur+”（剩余价值）”, f”{cl}（约）”]], rem_rows,
+                 col_w=[2.62, 2.3, 2.3], row_h=0.48)
+    _box(slide, f”领完一辈子，账户还剩近 {int(wlast['surrender']//1000 + 1e-9)/10:.1f} 万 继续传承给下一代”, 0.59, 11.0, 7.08, size=11, color=GRAY)
+    _footer(slide, rate, cl)
 
 
 def _save(prs):
