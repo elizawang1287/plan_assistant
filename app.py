@@ -71,8 +71,12 @@ async def export_ppt(payload: dict = None):
 async def export_combined(payload: dict = None):
     try:
         rate = float((payload or {}).get("rate", 6.8))
+        cl = payload.get("curLabel", "人民币")
         base = payload["base"]
         variants = payload.get("variants", []) or [base]
+        base["curLabel"] = cl
+        for v in variants:
+            v["curLabel"] = cl
         buf = ppt_export.build_combined_pptx(base, variants, rate)
         return StreamingResponse(
             buf,
