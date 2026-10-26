@@ -36,7 +36,12 @@ def _wan(v):
 
 
 def _rmb(v, rate):
-    return f"约 {int(v*rate//10000 + 1e-9)} 万"
+    total = v * rate
+    yi = int(total // 100000000 + 1e-9)
+    wan = int((total % 100000000) // 10000 + 1e-9)
+    if yi >= 1:
+        return f"约 {yi}亿{wan}万"
+    return f"约 {wan} 万"
 
 
 def _cl(data):
