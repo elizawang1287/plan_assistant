@@ -289,16 +289,17 @@ function render(data, fname){
   const curLabel = document.querySelector('input[name="cur"]:checked').value === 'HKD' ? '港币' : '人民币';
   const rows = pickRows(data.rows);
   const lastYr = rows.length ? rows[rows.length-1].year : null;
-  // 直接舍去（不四舍五入）：万为单位保留1位小数；加1e-9避免浮点误差多砍一位
-  const wU = v => (Math.floor(v/1000 + 1e-9)/10).toFixed(1)+'万';
-  // 人民币/港币换算：过亿显示为 X亿YYYY万
-  const fmtW = v => {
-    const total = v * rate;
-    const yi = Math.floor(total / 100000000 + 1e-9);
-    const wan = Math.floor((total % 100000000) / 10000 + 1e-9);
-    if (yi >= 1) return yi + '亿' + wan + '万';
-    return wan + '万';
+  // 金额缩写：>=1亿显示"X.X亿"，否则"X.X万"；整亿/整万不带小数；直接舍去（不四舍五入）
+  const fmtUnit = v => {
+    if (v >= 100000000) {
+      const t = Math.floor(v/1e7 + 1e-9)/10;
+      return (Math.round(t) === t ? Math.round(t) : t.toFixed(1)) + '亿';
+    }
+    const t = Math.floor(v/1000 + 1e-9)/10;
+    return (Math.round(t) === t ? Math.round(t) : t.toFixed(1)) + '万';
   };
+  const wU = fmtUnit;                  // 美元列
+  const fmtW = v => fmtUnit(v * rate); // 人民币/港币换算列
   const wR = v => '约'+fmtW(v);
   // 自动判断：前25年里有多少个非年龄标记的年度行；>=10说明是完整年度表，按年份显示；否则按岁数显示
   const yrSet = new Set(data.rows.filter(r=>!r.is_age_marker).map(r=>r.year));
@@ -362,19 +363,18 @@ function render(data, fname){
     const wlast = wrows[wrows.length-1];
     const annual = w.annual_withdrawal;
     const total = wlast.accumulated;
-    const wan = x => (Math.floor(x/1000 + 1e-9)/10).toFixed(1) + '万';
     const keyRows = wrows.filter((r,i) => i===0 || i===wrows.length-1 || r.year % 5 === 0);
     const kHtml = keyRows.map(r =>
       `<tr><td>第${r.year}年${r.year===wlast.year?(`（${r.age}岁）`):''}</td>
-        <td>${wan(r.surrender)}</td>
+        <td>${wU(r.surrender)}</td>
         <td>${fmtW(r.surrender)}</td></tr>`).join('');
     return `
     <div class="sec">
       <div class="sec-title">建议提取方案${label?`（${label}）`:''}</div>
       <div class="w-sub">从第${w.start_year}年开始提取，共提取 ${nYears} 年</div>
       <div class="w-big">每年领取 <b>${fmt(annual)}</b> ${vcur}</div>
-      <div class="w-small">（每年约 ${Math.floor(annual*rate/1000 + 1e-9)/10}万${curLabel}，每月约 ${Math.floor(annual*rate/10000/12*100 + 1e-9)/100}万${curLabel}）</div>
-      <div class="w-bold">${nYears} 年总共领取 <b>${wan(total)}</b>（约 ${fmtW(total)}${curLabel}）</div>
+      <div class="w-small">（每年约 ${fmtW(annual)}${curLabel}，每月约 ${fmtW(annual/12)}${curLabel}）</div>
+      <div class="w-bold">${nYears} 年总共领取 <b>${wU(total)}</b>（约 ${fmtW(total)}${curLabel}）</div>
       <div class="divider"></div>
       <div class="w-big">提取后账户剩余的总现金价值</div>
       <table class="w-table" style="margin-top:10px;">
@@ -382,7 +382,7 @@ function render(data, fname){
         ${kHtml}
       </table>
       <div class="narr" style="margin-top:10px;">
-        领完一辈子，账户还剩近 <b>${Math.floor(wlast.surrender/1000 + 1e-9)/10}万</b>（约 ${fmtW(wlast.surrender)}${curLabel}）继续传承给下一代。
+        领完一辈子，账户还剩近 <b>${wU(wlast.surrender)}</b>（约 ${fmtW(wlast.surrender)}${curLabel}）继续传承给下一代。
       </div>
       <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
     </div>`;

@@ -32,16 +32,16 @@ def pick_rows(data_rows):
 
 
 def _wan(v):
-    return f"{int(v//1000 + 1e-9)/10:.1f} 万"
+    if v >= 1e8:
+        t = int(v // 1e7 + 1e-9) / 10
+        return f"{int(t)} 亿" if t == int(t) else f"{t:.1f} 亿"
+    t = int(v // 1000 + 1e-9) / 10
+    return f"{int(t)} 万" if t == int(t) else f"{t:.1f} 万"
 
 
 def _rmb(v, rate):
     total = v * rate
-    yi = int(total // 100000000 + 1e-9)
-    wan = int((total % 100000000) // 10000 + 1e-9)
-    if yi >= 1:
-        return f"约 {yi}亿{wan}万"
-    return f"约 {wan} 万"
+    return _wan(total)
 
 
 def _cl(data):
@@ -146,7 +146,7 @@ def add_base_slides(prs, blank, data, rate=6.8):
     # 投入 + 正常预期
     slide = prs.slides.add_slide(blank)
     _box(slide, data["product_name"], 0.71, 0.30, 6.85, size=22, bold=True)
-    _box(slide, f"趸交 {b.get('total_premium',0)/10000:.1f} 万 {cur}", 0.71, 0.80, 6.85, size=14)
+    _box(slide, f"趸交 {_wan(b.get('total_premium',0))} {cur}", 0.71, 0.80, 6.85, size=14)
     _box(slide, f"{b.get('anb_age','')}岁{b.get('gender','')}性｜保单货币：{cur}", 0.71, 1.18, 6.85, size=11, color=GRAY)
     _box(slide, "退保价值", 0.74, 1.60, 6.85, size=16, bold=True)
     normal_rows = [[ylab(r), _wan(r["surrender"]), _rmb(r["surrender"], rate)] for r in rows]
@@ -201,15 +201,15 @@ def add_withdrawal_slide(prs, blank, data, rate=6.8, label=None):
     _box(slide, "建议提取方案" + (f"（{label}）" if label else ""), 0.59, 0.30, 7.08, size=18, bold=True)
     _box(slide, f"从第 {w['start_year']} 年开始提取，共提取 {n_years} 年", 0.59, 0.80, 7.08, size=12)
     _box(slide, f"每年领取 {annual:,.0f} {cur}", 0.59, 1.15, 7.08, size=16, bold=True)
-    _box(slide, f"（每年约 {int(annual*rate//1000 + 1e-9)/10:.1f} 万{cl}，每月约 {int(annual*rate//10000/12*100 + 1e-9)/100:.2f} 万{cl}）", 0.44, 1.55, 7.08, size=10, color=GRAY)
-    _box(slide, f"{n_years} 年总共领取 {int(total//1000 + 1e-9)/10:.1f} 万{cur}（约 {int(total*rate//10000 + 1e-9)} 万{cl}）", 0.59, 1.90, 7.08, size=13, bold=True)
+    _box(slide, f"（每年约 {_rmb(annual, rate)}{cl}，每月约 {_rmb(annual/12, rate)}{cl}）", 0.44, 1.55, 7.08, size=10, color=GRAY)
+    _box(slide, f"{n_years} 年总共领取 {_wan(total)}{cur}（约 {_rmb(total, rate)}{cl}）", 0.59, 1.90, 7.08, size=13, bold=True)
     _box(slide, "提取后账户剩余的总现金价值", 0.59, 2.40, 7.08, size=14, bold=True)
     key = [x for x in wrows if x["year"] == w["start_year"] or x["year"] % 5 == 0 or x == wrows[-1]]
     rem_rows = [[f"第 {x['year']} 年" + (f"（{x['age']}岁）" if x == wrows[-1] else ""),
                  _wan(x["surrender"]), _rmb(x["surrender"], rate)] for x in key]
     _build_table(slide, 2.85, [["保单年度", cur+"（剩余价值）", f"{cl}（约）"]], rem_rows,
                  col_w=[2.62, 2.3, 2.3], row_h=0.48)
-    _box(slide, f"领完一辈子，账户还剩近 {int(wlast['surrender']//1000 + 1e-9)/10:.1f} 万 继续传承给下一代", 0.59, 11.0, 7.08, size=11, color=GRAY)
+    _box(slide, f"领完一辈子，账户还剩近 {_wan(wlast['surrender'])} 继续传承给下一代", 0.59, 11.0, 7.08, size=11, color=GRAY)
     _footer(slide, rate, cl)
 
 
