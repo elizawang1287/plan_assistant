@@ -475,23 +475,56 @@ def add_withdrawal_slide(prs, blank, data, rate=6.8, label=None):
     wlast = wrows[-1]
     annual = w["annual_withdrawal"]
     total = wlast["accumulated"]
+    # 分阶段：连续年份且金额相同合并为一段
+    segs = []
+    for x in wrows:
+        s = segs[-1] if segs else None
+        if s and x["year"] == s["end"] + 1 and x["withdrawal"] == s["amt"]:
+            s["end"] = x["year"]
+        else:
+            segs.append({"start": x["year"], "end": x["year"], "amt": x["withdrawal"]})
 
     _box(slide, "建议提取方案" + (label or ""), 3.05, 0.30, 2.17, size=20, bold=True, color=INK0, align=PP_ALIGN.CENTER)
-    _box(slide, f"从第 {w['start_year']} 年开始提取，共提取 {n_years} 年", 2.72, 0.80, 2.81, size=12, color=DARK, align=PP_ALIGN.CENTER)
-    _richbox(slide, 2.54, 1.15, 3.18, 20,
-             [("每年领取 ", RED, True), (f"{annual:,.0f} ", RED, True), (cur, RED, True)],
-             align=PP_ALIGN.CENTER)
-    _box(slide, f"（每年约 {_rmb(annual, rate)}{cl}，每月约 {_rmb(annual/12, rate)}{cl}）",
-         1.92, 1.55, 4.13, size=12, color=DARK, align=PP_ALIGN.CENTER)
-    _richbox(slide, 1.32, 1.9, 5.63, 16,
-             [(f"{n_years} 年总共领取 {_wan(total)}{cur}（约 {_rmb(total, rate)}{cl}）", DARK, True)],
-             align=PP_ALIGN.CENTER)
-    _box(slide, "提取后账户剩余的总现金价值", 2.21, 2.40, 3.85, size=20, bold=True, color=DARK, align=PP_ALIGN.CENTER)
-    _add_line(slide, 0.59, 2.33, 7.08)
-    key = [x for x in wrows if x["year"] == w["start_year"] or x["year"] % 5 == 0 or x == wrows[-1]]
+    if len(segs) == 1:
+        _box(slide, f"从第 {w['start_year']} 年开始提取，共提取 {n_years} 年", 2.72, 0.80, 2.81, size=12, color=DARK, align=PP_ALIGN.CENTER)
+        _richbox(slide, 2.54, 1.15, 3.18, 20,
+                 [("每年领取 ", RED, True), (f"{annual:,.0f} ", RED, True), (cur, RED, True)],
+                 align=PP_ALIGN.CENTER)
+        _box(slide, f"（每年约 {_rmb(annual, rate)}{cl}，每月约 {_rmb(annual/12, rate)}{cl}）",
+             1.92, 1.55, 4.13, size=12, color=DARK, align=PP_ALIGN.CENTER)
+        _richbox(slide, 1.32, 1.9, 5.63, 16,
+                 [(f"{n_years} 年总共领取 {_wan(total)}{cur}（约 {_rmb(total, rate)}{cl}）", DARK, True)],
+                 align=PP_ALIGN.CENTER)
+        _box(slide, "提取后账户剩余的总现金价值", 2.21, 2.40, 3.85, size=20, bold=True, color=DARK, align=PP_ALIGN.CENTER)
+        _add_line(slide, 0.59, 2.33, 7.08)
+        table_y = 2.85
+    else:
+        _box(slide, f"从第 {w['start_year']} 年开始提取，共提取 {n_years} 年", 2.72, 0.68, 2.81, size=12, color=DARK, align=PP_ALIGN.CENTER)
+        _richbox(slide, 2.10, 1.00, 5.2, 13,
+                 [(f"提取安排（共 {n_years} 年）：", DARK, True)], align=PP_ALIGN.CENTER)
+        show_segs = segs[:3]
+        y = 1.34
+        for s in show_segs:
+            t = (f"第 {s['start']}-{s['end']} 年 · 每年提取 {s['amt']:,.0f}" if s['start'] != s['end']
+                 else f"第 {s['start']} 年 · 提取 {s['amt']:,.0f}")
+            _richbox(slide, 2.1, y, 5.0, 13, [(t, DARK, False)], align=PP_ALIGN.CENTER)
+            y += 0.36
+        if len(segs) > 3:
+            _richbox(slide, 2.1, y, 5.0, 12, [("后续年份提取金额不同，详见下方退保价值表", DARK, False)], align=PP_ALIGN.CENTER)
+            y += 0.36
+        _richbox(slide, 1.32, y, 5.63, 16,
+                 [(f"{n_years} 年总共领取 {_wan(total)}{cur}（约 {_rmb(total, rate)}{cl}）", DARK, True)],
+                 align=PP_ALIGN.CENTER)
+        y2 = y + 0.52
+        _box(slide, "提取后账户剩余的总现金价值", 2.21, y2, 3.85, size=20, bold=True, color=DARK, align=PP_ALIGN.CENTER)
+        _add_line(slide, 0.59, y2 - 0.07, 7.08)
+        table_y = y2 + 0.45
+    # 剩余价值关键年份：首、尾、每5年、每段边界
+    bd = {s["start"] for s in segs} | {s["end"] for s in segs}
+    key = [x for x in wrows if x["year"] == w["start_year"] or x["year"] % 5 == 0 or x == wrows[-1] or x["year"] in bd]
     rem_rows = [[f"第 {x['year']} 年",
                  _wan(x["surrender"]), _rmb(x["surrender"], rate)] for x in key]
-    _build_table(slide, 2.85, [["保单年度", cur + "（剩余价值）", f"{cl}（约）"]], rem_rows,
+    _build_table(slide, table_y, [["保单年度", cur + "（剩余价值）", f"{cl}（约）"]], rem_rows,
                  col_w=[2.62, 2.3, 2.3], row_h=0.40, hdr_size=18, data_size=14, red_cols=[2])
     _richbox(slide, 0.59, 11.0, 7.15, 16,
              [("领完一辈子，账户还剩近 ", DARK, False),
