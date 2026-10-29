@@ -16,6 +16,7 @@ PRODUCT_NAMES = {
     "PRMESP": "世誉财富保险计划",
     "TRST": "保诚信守明天多元货币保险计划",
     "CIM3": "诚保一生危疾保险计划",
+    "ENCASH": "保诚加护一生住院现金储蓄保险",
 }
 
 NUM = re.compile(r"^\d{1,3}(,\d{3})+(\.\d+)?$")  # 25,000 / 1,240,550
@@ -42,6 +43,8 @@ def detect_product(text):
         return "TRST"
     if "CIM3" in text or "誠保一生" in text or "誠保一生" in text or "危疾保險計劃" in text:
         return "CIM3"
+    if "ENCASH" in text or "加護一生住院現金" in text or "住院現金儲蓄保險" in text:
+        return "ENCASH"
     return "UNKNOWN"
 
 
@@ -415,6 +418,119 @@ def parse_cim3_rows(text, anb_age, total_premium, annual_premium=None, pay_years
     return [compute_metrics(r, total_premium, annual_premium, pay_years) for r in out]
 
 
+def parse_encash_rows(text, anb_age, total_premium, annual_premium=None, pay_years=None):
+    """解析 ENCASH（加护一生住院现金储蓄保险）「基本計劃 – 説明摘要」表。
+    每行 7 个数值：[已缴保费, 保证退保A, 非保证红利B, 退保总额, 保证身故, 身故红利, 身故总额]。
+    行标签：1-30 年写「第X年」，@ANB 岁起写「X岁」（无完整補充説明逐年表）。
+    返回 compute_metrics 后的行列表。"""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    n = len(lines)
+    start = None
+    for i, ln in enumerate(lines):
+        s = ln.replace("説", "說")
+        if ("説明摘要" in s or "說明摘要" in s) and "補充" not in s:
+            start = i
+            break
+    if start is None:
+        return []
+
+    raw = []
+    i = start
+    while i < n:
+        ln = lines[i]
+        if "備註" in ln:
+            break
+        year = None
+        m = ANB.search(ln)
+        if m:
+            age = int(m.group(1))
+            year = (age - anb_age) if anb_age else None
+        elif PLAIN_NUM.match(ln) and 1 <= int(ln) <= 101:
+            year = int(ln)
+        if year is not None:
+            vals = []
+            j = i + 1
+            while j < n and len(vals) < 7 and (NUM.match(lines[j]) or VAL.match(lines[j])):
+                vals.append(_to_num(lines[j]))
+                j += 1
+            if len(vals) >= 7:
+                age = (anb_age + year) if anb_age else None
+                raw.append({
+                    "year": year,
+                    "age": age,
+                    "is_age_marker": bool(ANB.search(ln)),
+                    "paid": vals[0],
+                    "surr_guaranteed": vals[1],
+                    "surr_bonus": vals[2],
+                    "surrender": vals[3],
+                    "death_guaranteed": vals[4],
+                    "death_bonus": vals[5],
+                    "death_total": vals[6],
+                })
+                i = j
+                continue
+        i += 1
+
+    seen = set()
+    out = []
+    for r in raw:
+        if r["year"] in seen:
+            continue
+        seen.add(r["year"])
+        out.append(r)
+    out.sort(key=lambda r: r["year"])
+    return [compute_metrics(r, total_premium, annual_premium, pay_years) for r in out]
+
+
+def parse_encash(text, basic):
+    """解析 ENCASH（加护一生住院现金储蓄保险）。
+    返回 basic_extra / rows（含 compute_metrics）/ product_advantage。"""
+    rows = parse_encash_rows(text, basic.get("anb_age"), basic.get("total_premium"),
+                             basic.get("annual_premium"), basic.get("pay_years"))
+    # 从退保表推导总保费与供款期：缴清后已缴保费恒定的第一个年份即供款期，其值为总保费
+    max_paid = max((r.get("paid") or 0) for r in rows) if rows else 0
+    pay_years = next((r["year"] for r in rows if (r.get("paid") or 0) >= max_paid), None) if rows else None
+    total_premium = max_paid or None
+    # 用推导出的正确参数重算单复利
+    rows = [compute_metrics(r, total_premium, basic.get("annual_premium"), pay_years) for r in rows]
+    basic_extra = {
+        "basic_amount": rows[0]["death_guaranteed"] if rows else basic.get("basic_amount"),
+        "coverage": "終身",
+        "annual_premium": basic.get("annual_premium"),
+        "pay_years": pay_years,
+        "total_premium": total_premium,
+        "premium_type": "年缴",
+    }
+    product_advantage = [
+        {
+            "title": "住院现金与长期病况保障",
+            "items": [
+                "每日住院现金：每日赔偿当时保额的0.1%（即每日250美元），每次住院最多90日",
+                "深切治疗住院现金：每日额外赔偿当时保额的0.1%（即额外250美元/日），双倍保障，最多90日",
+                "长期病况保障：每次一笔过赔偿当时保额的5%（即12,500美元），合共最高保额的15%（37,500美元）",
+                "覆盖严重脑退化症/帕金森病、严重糖尿病、长期住院超过90日，每项最多赔偿一次",
+            ],
+        },
+        {
+            "title": "身故保障，高杠杆",
+            "items": [
+                "身故赔偿：保证赔付100%保额（250,000美元）+累计终期红利面值，锁定高额身故杠杆",
+                "首年杠杆高：第一年保费3,105美元即可撬动250,000美元身故保障（约80.5倍）",
+                "与现有医疗重疾险不冲突，可叠加使用",
+            ],
+        },
+        {
+            "title": "有病赔钱，无病储蓄",
+            "items": [
+                "住院现金随心使用，住院期间每日现金流进账",
+                "分红型保单，现金价值随时间持续增长，退保可取回连本带利",
+                "退保价值逐年增长，101岁退保可领6,308,365美元（约4,416万人民币），传承下一代",
+            ],
+        },
+    ]
+    return {"basic_extra": basic_extra, "rows": rows, "product_advantage": product_advantage}
+
+
 def parse_withdrawal(text, anb_age, product):
     """
     解析「現金價值提取下退保價值」表（即有提取安排的计划书）。
@@ -536,6 +652,13 @@ def parse_pdf(pdf_path):
         basic.update(cim3["basic_extra"])
         rows = cim3["rows"]
         product_advantage = cim3["product_advantage"]
+        withdrawal = None
+        optimistic = {}
+    elif product == "ENCASH":
+        enc = parse_encash(text, basic)
+        basic.update(enc["basic_extra"])
+        rows = enc["rows"]
+        product_advantage = enc["product_advantage"]
         withdrawal = None
         optimistic = {}
     else:

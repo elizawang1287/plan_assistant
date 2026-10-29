@@ -462,6 +462,150 @@ def add_cim3_slides(prs, blank, data, rate=6.8):
     _footer(slide, rate, cl)
 
 
+def add_encash_slides(prs, blank, data, rate=6.8):
+    """ENCASH（加护一生住院现金储蓄保险）：基础信息 + 保障与退保价值 + 退保价值(单利复利) + 住院现金保障 + 产品优势。"""
+    b = data["basic"]
+    cl = _cl(data)
+    cur = b.get("currency", "美元")
+    all_rows = data["rows"]
+    rows = pick_rows(all_rows)
+    last_y = rows[-1]["year"] if rows else None
+    has_gap = any(r.get("is_age_marker") and r["year"] != last_y for r in rows)
+    age = b.get("anb_age", "")
+    if has_gap:
+        ylab = lambda r: (f"{r['age']}岁") if r.get("is_age_marker") else f"第 {r['year']} 年"
+    else:
+        ylab = lambda r: f"第 {r['year']} 年"
+
+    # === Slide 1：基础信息 ===
+    slide = prs.slides.add_slide(blank)
+    _box(slide, data["product_name"], 0.71, 0.15, 6.85, size=24, bold=True, color=RED, align=PP_ALIGN.CENTER)
+    _richbox(slide, 0.71, 0.69, 6.85, 16, _premium_desc(b, cur), align=PP_ALIGN.CENTER)
+    _box(slide, f"{age}岁｜保单货币：{cur}", 0.71, 1.14, 6.85, size=12, color=GRAY, align=PP_ALIGN.CENTER)
+    _add_line(slide, 0.52, 1.54, 7.08)
+    _box(slide, "基础信息", 0.52, 1.60, 7.22, size=20, bold=True, color=DARK, align=PP_ALIGN.CENTER)
+    base_rows = [
+        ["基本保额", _wan(b.get("basic_amount") or 0), _rmb(b.get("basic_amount") or 0, rate)],
+        ["保障期", b.get("coverage") or "终身", ""],
+        ["供款期", f"{b.get('pay_years')} 年" if b.get("pay_years") else "-", ""],
+        ["年保费", f"{int(b.get('annual_premium') or 0):,}", f"{int((b.get('annual_premium') or 0) * rate):,}"],
+        ["总保费", f"{int(b.get('total_premium') or 0):,}", f"{int((b.get('total_premium') or 0) * rate):,}"],
+    ]
+    _build_table(slide, 2.05, [["项目", cur, f"{cl}（约）"]], base_rows,
+                 col_w=[3.2, 2.0, 2.0], row_h=0.40, hdr_size=24, data_size=15, red_cols=[2])
+    _box(slide, "保障 · 退保价值 · 产品优势 详见后页", 0.52, 10.9, 7.22, size=16, color=RED, align=PP_ALIGN.CENTER)
+    _footer(slide, rate, cl)
+
+    # === Slide 2：保障与退保价值 ===
+    slide = prs.slides.add_slide(blank)
+    _box(slide, "保障与退保价值（正常预期）", 1.9, 0.20, 4.4, size=22, bold=True, color=DARK, align=PP_ALIGN.CENTER)
+    _box(slide, "人寿保障 = 保证身故保障 + 累计终期红利；健康退保领取 = 退保现金价值",
+         0.52, 0.72, 7.22, size=12, color=GRAY, align=PP_ALIGN.CENTER)
+    val_rows = [[ylab(r), _wan(r["paid"]), _wan(r["death_total"]), _wan(r["surrender"]), _rmb(r["surrender"], rate)]
+                for r in rows]
+    _build_table(slide, 1.25,
+                 [["保单年度", "已缴保费", "人寿保障", "健康退保领取", f"{cl}（约）"]],
+                 val_rows, col_w=[1.35, 1.4, 1.45, 1.5, 1.52], row_h=0.42,
+                 hdr_size=13, data_size=12, red_cols=[3])
+    _footer(slide, rate, cl)
+
+    # === Slide 3：退保价值与回报率 ===
+    slide = prs.slides.add_slide(blank)
+    _box(slide, "退保价值与回报率", 2.35, 0.20, 3.6, size=22, bold=True, color=DARK, align=PP_ALIGN.CENTER)
+    _box(slide, "单利/复利为基于总保费的估算年化回报；保单前期退保价值低于已缴保费，故回报率以 / 显示",
+         0.52, 0.72, 7.22, size=12, color=GRAY, align=PP_ALIGN.CENTER)
+    sr_rows = []
+    for r in rows:
+        s = f"{r['simple_pct']}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
+        c = f"{r['compound_pct']}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
+        sr_rows.append([ylab(r), _wan(r["paid"]), _wan(r["death_total"]),
+                        _wan(r["surrender"]), _rmb(r["surrender"], rate), s, c])
+    _build_table(slide, 1.25,
+                 [["保单年度", "已缴保费", "人寿保障", f"退保价值({cur})", f"{cl}（约）", "单利%/年", "复利%/年"]],
+                 sr_rows, col_w=[1.05, 1.0, 1.1, 1.1, 1.05, 0.95, 0.95], row_h=0.42,
+                 hdr_size=13, data_size=12, red_cols=[4])
+    _footer(slide, rate, cl)
+
+    # === Slide 4：住院现金与长期病况保障 ===
+    slide = prs.slides.add_slide(blank)
+    _box(slide, "住院现金与长期病况保障", 2.0, 0.18, 4.2, size=22, bold=True, color=DARK, align=PP_ALIGN.CENTER)
+    _box(slide, f"美元汇率：{rate}（仅供参考）", 0.55, 0.60, 7.2, size=10, color=GRAY)
+    G = b.get("basic_amount") or 0
+    daily = int(G * 0.001)
+    lc = int(G * 0.05)
+    lc_max = int(G * 0.15)
+    groups = [
+        ("住院现金保障", [
+            ("每日住院现金", "每日赔偿当时保额0.1%（每日250美元），每次住院最多90日", daily),
+            ("深切治疗住院现金", "每日额外赔偿当时保额0.1%（额外250美元/日），双倍保障，最多90日", daily),
+        ]),
+        ("长期病况保障", [
+            ("严重脑退化症/帕金森病", "一次性赔偿当时保额5%，每项最多赔偿一次", lc),
+            ("严重糖尿病", "一次性赔偿当时保额5%，每项最多赔偿一次", lc),
+            ("长期住院（超过90日）", "一次性赔偿当时保额5%（上限12,500美元）", lc),
+            ("长期病况合计", "以上病况合共最高保额15%", lc_max),
+        ]),
+        ("人寿保障", [
+            ("身故赔偿", "保证赔付100%保额+累计终期红利面值，须扣除已索偿总额", int(G)),
+        ]),
+        ("退保与储蓄", [
+            ("退保领取", "保证现金价值+终期红利现金价值，连本带利取出", None),
+        ]),
+    ]
+    n_rows = 1 + sum(1 + len(rows) for _, rows in groups)
+    tbl = slide.shapes.add_table(n_rows, 3, Inches(0.52), Inches(0.98), Inches(7.22), Inches(0.5 * n_rows)).table
+    for i, w in enumerate([3.9, 1.77, 1.55]):
+        tbl.columns[i].width = Inches(w)
+    tbl.rows[0].height = Inches(0.32)
+    for j, h in enumerate(["保障内容", "美元", "人民币（约）"]):
+        _style_cell(tbl.cell(0, j), h, bold=True, color=WHITE, size=11, fill=RED)
+    r = 1
+    for gi, (g, rows) in enumerate(groups):
+        _style_cell_lines(tbl.cell(r, 0), [(g, True, RED, 11)], align=PP_ALIGN.LEFT, fill=LIGHT)
+        r += 1
+        for name, note, v in rows:
+            _style_cell_lines(tbl.cell(r, 0),
+                              [(name, True, DARK, 10), (note, False, GRAY, 8)],
+                              align=PP_ALIGN.LEFT, fill=None)
+            usd = v if isinstance(v, str) else (f"{int(v):,}" if v is not None else "—")
+            cny = "—" if (v is None or isinstance(v, str)) else f"{int(v * rate):,}"
+            _style_cell(tbl.cell(r, 1), usd, size=10, color=RED)
+            _style_cell(tbl.cell(r, 2), cny, size=10)
+            tbl.rows[r].height = Inches(0.5)
+            r += 1
+    _footer(slide, rate, cl)
+
+    # === Slide 5：产品优势（文字版 1/2）===
+    advs = data.get("product_advantage") or []
+    slide = prs.slides.add_slide(blank)
+    _box(slide, "产品优势", 3.2, 0.18, 1.9, size=22, bold=True, color=DARK, align=PP_ALIGN.CENTER)
+    top = 0.70
+    if advs:
+        a0 = advs[0]
+        _box(slide, "■ " + a0["title"], 0.55, top, 7.2, size=15, color=RED, bold=True)
+        top += 0.40
+        for it in a0["items"]:
+            parts = it.split("·", 1)
+            tag = parts[0]
+            body = parts[1] if len(parts) > 1 else ""
+            _richbox_red(slide, 0.55, top, 7.15, 12, [(f"{tag}  ", RED, True), (body, DARK, False)], h=0.9)
+            top += 0.04 + 0.26 * _est_lines(body)
+    _footer(slide, rate, cl)
+
+    # === Slide 6：产品优势（文字版 2/2）===
+    slide = prs.slides.add_slide(blank)
+    _box(slide, "产品优势", 3.2, 0.18, 1.9, size=22, bold=True, color=DARK, align=PP_ALIGN.CENTER)
+    top = 0.70
+    for a in advs[1:]:
+        _box(slide, "■ " + a["title"], 0.55, top, 7.2, size=15, color=RED, bold=True)
+        top += 0.40
+        for it in a["items"]:
+            _richbox_red(slide, 0.78, top, 7.0, 12, [(it, DARK, False)], h=0.3 * _est_lines(it) + 0.1)
+            top += 0.10 + 0.26 * _est_lines(it)
+        top += 0.14
+    _footer(slide, rate, cl)
+
+
 def add_withdrawal_slide(prs, blank, data, rate=6.8, label=None):
     """提取方案页。label 用于多方案序号（一/二/三…）。"""
     w = data.get("withdrawal")
@@ -542,10 +686,12 @@ def _save(prs):
 
 
 def build_pptx(data, rate=6.8):
-    """单份：基础表 + 提取页（CIM3 走专属页）。"""
+    """单份：基础表 + 提取页（CIM3 / ENCASH 走专属页）。"""
     prs, blank = _new_prs()
     if data.get("product_code") == "CIM3":
         add_cim3_slides(prs, blank, data, rate)
+    elif data.get("product_code") == "ENCASH":
+        add_encash_slides(prs, blank, data, rate)
     else:
         add_base_slides(prs, blank, data, rate)
         add_withdrawal_slide(prs, blank, data, rate)
