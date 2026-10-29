@@ -419,18 +419,27 @@ def parse_cim3_rows(text, anb_age, total_premium, annual_premium=None, pay_years
 
 
 def parse_encash_rows(text, anb_age, total_premium, annual_premium=None, pay_years=None):
-    """解析 ENCASH（加护一生住院现金储蓄保险）「基本計劃 – 説明摘要」表。
+    """解析 ENCASH（加护一生住院现金储蓄保险）退保价值 + 身故保障表。
+    优先取「基本計劃補充説明」的完整逐年表（→ 全部按「第X年」显示）；
+    若无该页，回退到「基本計劃説明摘要」的里程碑表（→ 30年前「第X年」、30年后「X岁」）。
     每行 7 个数值：[已缴保费, 保证退保A, 非保证红利B, 退保总额, 保证身故, 身故红利, 身故总额]。
-    行标签：1-30 年写「第X年」，@ANB 岁起写「X岁」（无完整補充説明逐年表）。
     返回 compute_metrics 后的行列表。"""
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     n = len(lines)
     start = None
+    # 优先：完整逐年表（含「補充」的説明摘要）
     for i, ln in enumerate(lines):
         s = ln.replace("説", "說")
-        if ("説明摘要" in s or "說明摘要" in s) and "補充" not in s:
+        if ("説明摘要" in s or "說明摘要" in s) and "補充" in s:
             start = i
             break
+    # 回退：基本计划说明摘要（里程碑表）
+    if start is None:
+        for i, ln in enumerate(lines):
+            s = ln.replace("説", "說")
+            if ("説明摘要" in s or "說明摘要" in s) and "補充" not in s:
+                start = i
+                break
     if start is None:
         return []
 
