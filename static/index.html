@@ -59,6 +59,18 @@
   .foot{padding:12px 18px 18px;}
   .foot .src{font-size:11px;color:#bbb;margin-bottom:8px;}
   .foot .disc{font-size:11px;color:#bbb;text-align:center;}
+  .adv{margin-bottom:18px;padding:10px 12px;background:#fff;border:1px solid #f3d9d7;border-radius:8px;}
+  .adv-title{font-size:15px;font-weight:700;color:#d0342c;line-height:1.4;margin:0 0 8px;padding:0 0 8px 10px;border-left:4px solid #d0342c;}
+  .adv ul{margin:6px 0 0;padding-left:18px;font-size:13px;line-height:1.9;color:#333;}
+  .adv li{margin-bottom:3px;word-break:break-word;overflow-wrap:anywhere;}
+  .adv-dim{margin-bottom:10px;font-size:13px;line-height:1.9;color:#333;word-break:break-word;overflow-wrap:anywhere;}
+  .adv-dim:last-child{margin-bottom:0;}
+  .adv-kw{color:#d0342c;font-weight:700;}
+  .nred{color:#d0342c;font-weight:700;}
+  .adv-dim-body{flex:1;min-width:0;}
+  .ben-group th{background:#fdf0ef;color:#d0342c;font-size:13px;font-weight:700;text-align:left;padding:6px 8px;}
+  .ben-item{font-size:13px;font-weight:700;color:#333;}
+  .ben-note{font-size:12px;font-weight:400;color:#666;line-height:1.7;margin-top:3px;}
   .narr{background:#fdecec;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.7;color:#444;}
   .narr b{color:var(--pr);}
 
@@ -278,6 +290,7 @@ function pickRows(rows){
 
 let lastData = null;
 function render(data, fname){
+  if (data.product_code === 'CIM3') { renderCIM3(data, fname); return; }
   lastData = data;
   $('#warn').style.display = data.warning ? 'block':'none';
   $('#warn').textContent = data.warning ? '⚠ '+data.warning : '';
@@ -436,6 +449,161 @@ function render(data, fname){
   $('#summaryBox').style.display='block';
 }
 
+// CIM3（诚保一生危疾保险计划）专用渲染：基础信息 / 基本保障 / 退保价值（含单利复利+币种换算） / 产品优势
+function renderCIM3(data, fname){
+  lastData = data;
+  $('#warn').style.display = data.warning ? 'block':'none';
+  $('#warn').textContent = data.warning ? '⚠ '+data.warning : '';
+  $('#status').textContent = '解析完成';
+  $('#toolbar').style.display='flex';
+  const b = data.basic;
+  const cur = b.currency || '美元';
+  const rate = parseFloat($('#rate').value) || 6.8;
+  const curLabel = document.querySelector('input[name="cur"]:checked').value === 'HKD' ? '港币' : '人民币';
+  // 行选择与标签：完整逐年表（有补充说明）→ 每5年+末行，全部按「第X年」；
+  // 断档里程碑表（无补充说明）→ 30年前按「第X年」、30年后按「X岁」
+  const rows = pickRows(data.rows);
+  const lastY = rows.length ? rows[rows.length-1].year : null;
+  const hasGap = rows.some(r => r.is_age_marker && r.year !== lastY);
+  // 金额缩写：>=1亿"X.X亿"，否则"X.X万"；整亿/整万不带小数；直接舍去
+  const fmtUnit = v => {
+    if (v >= 100000000) { const t = Math.floor(v/1e7 + 1e-9)/10; return (Math.round(t) === t ? Math.round(t) : t.toFixed(1)) + '亿'; }
+    const t = Math.floor(v/1000 + 1e-9)/10; return (Math.round(t) === t ? Math.round(t) : t.toFixed(1)) + '万';
+  };
+  const wU = fmtUnit;                  // 美元列
+  const fmtW = v => fmtUnit(v * rate); // 人民币/港币换算列
+  const rowCls = r => r.is_age_marker ? ' class="age-row"' : '';
+  const ylab = r => hasGap ? (r.is_age_marker ? `${r.age}岁` : `第${r.year}年`) : `第${r.year}年`;
+  const money = (label, v) => `<tr><td>${label}</td><td>${v!=null?fmt(v):'-'}</td><td>${v!=null?fmtW(v):'-'}</td></tr>`;
+  const basicHtml = `
+    <tr><th>项目</th><th>${cur}</th><th>${curLabel}</th></tr>
+    ${money('基本保额', b.basic_amount)}
+    ${money('首10年赠送保障（升级保障）', b.gift10)}
+    ${money('总保障额', b.total_amount)}
+    <tr><td>保障期</td><td colspan="2">${b.coverage||'终身'}</td></tr>
+    <tr><td>供款期</td><td colspan="2">${b.pay_years? (b.pay_years+'年') : '-'}</td></tr>
+    ${money('年保费', b.annual_premium)}
+    ${money('总保费', b.total_premium)}
+  `;
+  const giftText = `${wU(b.basic_amount)}×9次`;
+  const annuityText = Math.round((data.basic.basic_amount || 0) * 0.06).toLocaleString() + '/年';
+  const lifeText = `${wU(b.basic_amount)}美元`;
+  const protHtml = rows.map(r => `
+    <tr${rowCls(r)}>
+      <td>${ylab(r)}</td>
+      <td>${wU(r.paid)}</td>
+      <td>${wU(r.death_total)}</td>
+      <td>${giftText}</td>
+      <td>${annuityText}</td>
+      <td>${lifeText}</td>
+      <td>${wU(r.surrender)}</td>
+    </tr>`).join('');
+  const srHtml = rows.map(r => {
+    const s = (r.simple_pct != null && r.simple_pct > 0) ? (r.simple_pct+'%') : '/';
+    const c = (r.compound_pct != null && r.compound_pct > 0) ? (r.compound_pct+'%') : '/';
+    return `<tr${rowCls(r)}>
+      <td>${ylab(r)}</td>
+      <td>${wU(r.paid)}</td>
+      <td>${wU(r.death_total)}</td>
+      <td>${wU(r.surrender)}</td>
+      <td>${fmtW(r.surrender)}</td>
+      <td>${s}</td>
+      <td>${c}</td>
+    </tr>`;
+  }).join('');
+  const numRed = s => (s || '').replace(/(\d[\d,]*(?:\.\d+)?%?)/g, m => `<b class="nred">${m}</b>`);
+  const advHtml = (data.product_advantage||[]).map(a => {
+    const body = a.items.map(it => {
+      const m = it.match(/^(生|病|老|死)·(.*)$/);
+      if (m) {
+        const b2 = m[2];
+        const ci = b2.indexOf("：");
+        const head = ci > 0 ? b2.slice(0, ci + 1) : b2;
+        const rest = ci > 0 ? b2.slice(ci + 1) : "";
+        return `<div class="adv-dim"><b class="adv-kw">${head}</b>${numRed(rest)}</div>`;
+      }
+      return `<li>${numRed(it)}</li>`;
+    }).join('');
+    return `<div class="adv"><div class="adv-title">${a.title}</div>${body}</div>`;
+  }).join('');
+  // 保障明细表（参考图2：保障内容 | 人民币 | 美元），按保障类型分组
+  const _b = data.basic;
+  const _G = _b.basic_amount || 0;
+  const benG = [
+    {g:"危疾保障", rows:[
+      {c:"第一次重疾理赔", n:"覆盖127种病况（49早期+56严重+15儿童重疾+7儿童次级）；首10年升级保障总额150%", v:(_G+(_b.gift10||0))},
+      {c:"重症多次理赔", n:"延伸保障最高累计900%保额、每笔100%——癌症2次、心脏病/中风2次、脑退化·帕金森1次、主要器官2次、其他2次（最多9次）", v:_G*9},
+    ]},
+    {g:"特殊关怀", rows:[
+      {c:"深切治疗ICU保障", n:"连续入住ICU三日或以上，获赔基本保额10%", v:_G*0.1},
+      {c:"脑退化/帕金森病终身年金", n:"确诊后每年支付基本保额6%，直至身故", v:null, amt:Math.round(_G*0.06).toLocaleString()+'/年'},
+      {c:"儿童专属保障", n:"严重湿疹、荨麻疹、肺炎住院津贴等", v:null},
+    ]},
+    {g:"人寿与身故", rows:[
+      {c:"人寿延伸保障", n:"严重疾病理赔后、86岁前身故，额外赔付", v:_G},
+    ]},
+    {g:"保费与退保", rows:[
+      {c:"保费豁免", n:"确诊严重疾病后，豁免日后所有保费", v:null},
+      {c:"退保提取", n:"连本带利取回保单现金价值（见退保价值表）", v:null},
+    ]},
+  ];
+  const benHtml = benG.map(gr => `
+      <tr class="ben-group"><th colspan="3">${gr.g}</th></tr>
+      ${gr.rows.map(r => `<tr>
+        <td class="ben-item">${r.c}<div class="ben-note">${r.n}</div></td>
+        <td>${r.amt!=null?r.amt:(r.v!=null?wU(r.v):'—')}</td>
+        <td>${r.v!=null?fmtW(r.v):'—'}</td></tr>`).join('')}`).join('');
+  card.innerHTML = `
+    <div class="banner">${data.product_name}</div>
+    <div class="sec">
+      <div class="sec-title">基础信息</div>
+      <table class="w-table">${basicHtml}</table>
+      <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
+    </div>
+    <div class="sec">
+      <div class="sec-title">基本保障</div>
+      <div class="w-small" style="margin-bottom:8px;">*再次重疾保障每次100%基本保额、最多9次；严重脑退化症及帕金森病终身年金每年基本保额6%；人寿延伸保障100,000美元（严重疾病理赔后、86岁前身故）。</div>
+      <table class="w-table">
+        <tr><th>保单年度</th><th>已缴保费</th><th>首次重疾或身故</th><th>再次重疾(×9)</th><th>严重脑退化及帕金森年金</th><th>人寿延伸保障</th><th>退保价值</th></tr>
+        ${protHtml}
+      </table>
+    </div>
+    <div class="sec">
+      <div class="sec-title">退保价值与回报率</div>
+      <div class="w-small" style="margin-bottom:8px;">单利/复利为基于总保费的估算年化回报；保单前期退保价值低于已缴保费，故回报率以"/"显示。</div>
+      <table class="w-table">
+        <tr><th>保单年度</th><th>已缴保费</th><th>首次重疾或身故</th><th>退保价值(${cur})</th><th>${curLabel}（约）</th><th>单利%/年</th><th>复利%/年</th></tr>
+        ${srHtml}
+      </table>
+      <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
+    </div>
+    <div class="sec">
+      <div class="sec-title">产品优势</div>
+      <table class="w-table">
+        <tr><th style="width:46%;">保障内容</th><th style="width:28%;">美元</th><th style="width:26%;">人民币（约）</th></tr>
+        ${benHtml}
+      </table>
+      <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
+      ${advHtml}
+    </div>
+    <div class="foot">
+      <div class="src">来源：${fname}</div>
+      <div class="disc">*内容及数字仅做参考 以合约为准 · 非保证利益可能调整</div>
+    </div>`;
+  card.style.display='block';
+
+  // 摘要文字
+  const last = rows[rows.length-1];
+  const y10 = rows.find(r=>r.year===10), y20 = rows.find(r=>r.year===20);
+  let summary = `这份${data.product_name}（${data.product_code}）计划书的受保人为${b.anb_age}岁${b.gender||''}性（${b.smoker||''}），采用${cur}保单。基本保额${fmt(b.basic_amount)}${cur}，首10年附送升级保障${fmt(b.gift10)}${cur}（总保障${fmt(b.total_amount)}${cur}），保障${b.coverage||'终身'}，供款${b.pay_years}年，每年保费${fmt(b.annual_premium)}${cur}。`;
+  summary += (y10?`第10个保单年度（${y10.age}岁）预计退保价值${fmt(y10.surrender)}${cur}；`:'')+
+    (y20?`第20个保单年度（${y20.age}岁）预计退保价值${fmt(y20.surrender)}${cur}；`:'')+
+    (last?`至${last.age}岁预计退保价值${fmt(last.surrender)}${cur}。`:'');
+  summary += `以上金额按计划书列示，非保证利益可能调整，以正式计划书及条款为准。`;
+  $('#summaryText').value = summary;
+  $('#summaryBox').style.display='block';
+}
+
 $('#btnCopy').onclick = async () => {
   await navigator.clipboard.writeText($('#summaryText').value);
   $('#status').textContent = '摘要已复制 ✓';
@@ -459,7 +627,7 @@ $('#btnImg').onclick = async () => {
   const blob = await res.blob();
   const b = lastData.basic || {};
   const prod = (lastData.product_name || '计划书').replace(/保险计划/g,'').replace(/\s/g,'');
-  const prem = ((b.total_premium||0)/10000).toFixed(1).replace(/\.0$/,'');
+  const prem = ((b.basic_amount||0)/10000).toFixed(1).replace(/\.0$/,'');
   const sug = multi ? `${prod}_${b.anb_age||''}岁_${prem}万_多方案.pptx` : `${prod}_${b.anb_age||''}岁_${prem}万.pptx`;
   if (window.showSaveFilePicker) {
     try {
@@ -489,7 +657,7 @@ $('#btnLong').onclick = async () => {
     const blob = await new Promise(r => c.toBlob(r, 'image/png'));
     const b = lastData.basic || {};
     const prod = (lastData.product_name || '计划书').replace(/保险计划/g,'').replace(/\s/g,'');
-    const prem = ((b.total_premium||0)/10000).toFixed(1).replace(/\.0$/,'');
+    const prem = ((b.basic_amount||0)/10000).toFixed(1).replace(/\.0$/,'');
     const sug = `${prod}_${b.anb_age||''}岁_${prem}万_长图.png`;
     if (window.showSaveFilePicker) {
       try {
