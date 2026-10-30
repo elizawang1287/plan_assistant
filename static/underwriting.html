@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>核保查询 · 医疗核保指引</title>
+<style>
+  :root{
+    --pr: #e60012;            /* 保诚红 */
+    --pr-dark: #c00010;
+    --ink: #222;
+    --gray: #888;
+    --line: #eee;
+    --bg: #f5f6f8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--ink);}
+  header{background:#fff;padding:14px 22px;display:flex;align-items:center;gap:10px;
+         border-bottom:1px solid var(--line);}
+  header .logo{font-size:18px;font-weight:700;color:var(--pr);}
+  header .sub{font-size:12px;color:var(--gray);}
+  header a.back{margin-left:auto;font-size:13px;color:var(--pr);text-decoration:none;}
+  .wrap{max-width:760px;margin:20px auto;padding:0 16px;}
+  .btn{border:none;border-radius:8px;padding:9px 16px;font-size:14px;cursor:pointer;}
+  .btn-primary{background:var(--pr);color:#fff;}
+  .btn:hover{opacity:.9;}
+
+  /* 核保查询视图 */
+  .uw-searchbar{display:flex;gap:8px;margin:16px 0;position:relative;}
+  .uw-searchbar input[type=text]{flex:1;padding:10px 12px;border:1px solid var(--line);
+           border-radius:8px;font-size:14px;font-family:inherit;}
+  .uw-searchbar input[type=text]:focus{outline:none;border-color:var(--pr);}
+  .uw-suggest{position:absolute;top:44px;left:0;right:60px;background:#fff;border:1px solid var(--line);
+           border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.1);max-height:280px;overflow-y:auto;
+           z-index:50;display:none;}
+  .uw-suggest .item{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f5f5f5;}
+  .uw-suggest .item:last-child{border-bottom:none;}
+  .uw-suggest .item:hover{background:#fff5f6;color:var(--pr);}
+  .uw-suggest .item .en{color:#999;font-size:12px;margin-left:6px;}
+  .uw-cats{margin:10px 0;}
+  .uw-cats .cat-title,.cat-title{font-size:13px;color:#666;margin:14px 0 8px;}
+  .uw-cat-chip{display:inline-block;border:1px solid var(--line);background:#fff;border-radius:16px;
+           padding:6px 14px;margin:0 6px 8px 0;font-size:13px;cursor:pointer;}
+  .uw-cat-chip:hover{border-color:var(--pr);color:var(--pr);background:#fff5f6;}
+  .uw-list .row{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;
+           background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;}
+  .uw-list .row:hover{border-color:var(--pr);}
+  .uw-list .row .nm{font-size:14px;font-weight:600;}
+  .uw-list .row .en{font-size:12px;color:#999;margin-left:6px;font-weight:400;}
+  .uw-list .row .arrow{color:#ccc;}
+  .uw-empty{padding:30px;text-align:center;color:var(--gray);font-size:14px;}
+  .uw-meta{font-size:12px;color:#999;margin:8px 0 14px;}
+  .uw-matrix-note{background:#fff7e6;border:1px solid #ffd591;color:#ad6800;padding:8px 12px;
+           border-radius:8px;font-size:12px;margin-bottom:8px;line-height:1.6;}
+  .uw-txt{font-size:13px;line-height:1.8;color:#333;white-space:pre-wrap;word-break:break-word;}
+  .uw-notes{margin:0;padding-left:18px;font-size:13px;line-height:1.8;color:#555;}
+  .uw-notes li{margin-bottom:4px;}
+  .uw-card{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.06);}
+  .banner{background:linear-gradient(135deg,#ff3b30,var(--pr));color:#fff;text-align:center;
+          padding:18px;font-size:20px;font-weight:700;letter-spacing:1px;}
+  .sec{padding:14px 18px;}
+  .sec-title{background:linear-gradient(90deg,#ff5a52,#ff8a80);color:#fff;font-weight:700;
+             padding:7px 12px;border-radius:6px;font-size:15px;margin-bottom:10px;}
+  .w-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .w-table th{background:var(--pr);color:#fff;font-weight:600;}
+  .w-table td{border:1px solid var(--line);padding:8px 6px;text-align:center;font-variant-numeric:tabular-nums;}
+  .w-table tr:nth-child(even) td{background:#fafafa;}
+  .foot{padding:12px 18px 18px;}
+  .foot .src{font-size:11px;color:#bbb;margin-bottom:8px;}
+  .foot .disc{font-size:11px;color:#bbb;text-align:center;}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">核保查询</span>
+  <span class="sub">医疗核保指引手册 · 疾病核保结果查询</span>
+  <a class="back" href="./">← 返回计划书助手</a>
+</header>
+
+<div class="wrap">
+  <div class="uw-meta" id="uwMeta"></div>
+  <div class="uw-searchbar">
+    <input type="text" id="uwInput" placeholder="输入疾病名称（繁/简/英文均可），如：高血压 / hypertension / 甲状腺结节">
+    <button class="btn btn-primary" id="uwBtn">搜索</button>
+    <div class="uw-suggest" id="uwSuggest"></div>
+  </div>
+  <div id="uwBody"></div>
+  <div class="foot" style="background:#fff;border-radius:10px;margin-top:18px;">
+    <div class="disc" id="uwFoot"></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+function uwEsc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+let uwCategories = [];
+let uwVersion = '';
+
+async function uwLoadMeta(){
+  try{
+    const res = await fetch('/api/underwriting/meta');
+    if(!res.ok){ $('#uwMeta').textContent = '核保知识库暂不可用（HTTP '+res.status+'）'; return; }
+    const m = await res.json();
+    const man = m.manual || {};
+    uwVersion = `手册版本 ${uwEsc(man.version||'')}｜版本日期 ${uwEsc(man.version_date||'')}`;
+    uwCategories = m.categories || [];
+    $('#uwMeta').innerHTML = `共收录 <b style="color:var(--pr);">${m.disease_count}</b> 种疾病条目　·　附录 ${m.appendices_count} 份　·　${uwEsc(uwVersion)}`;
+    $('#uwFoot').textContent = '* 本指引仅供内部参考使用，不得对外（包括客户或公众人士）发放。公司保留最终核保决定权。　' + uwVersion;
+    uwRenderCategories();
+  }catch(e){
+    $('#uwMeta').textContent = '核保知识库暂不可用：' + e.message;
+  }
+}
+
+function uwRenderCategories(){
+  if(!uwCategories.length){ $('#uwBody').innerHTML = '<div class="uw-empty">暂无可浏览分类</div>'; return; }
+  const chips = uwCategories.map(c => `<span class="uw-cat-chip" data-cat="${uwEsc(c)}">${uwEsc(c)}</span>`).join('');
+  $('#uwBody').innerHTML = `<div class="uw-cats"><div class="cat-title">按分类浏览（${uwCategories.length} 类）：</div>${chips}</div>`;
+  $('#uwBody').querySelectorAll('.uw-cat-chip').forEach(ch => ch.onclick = () => uwSearch(ch.dataset.cat));
+}
+
+async function uwSearch(q){
+  q = (q||'').trim();
+  if(!q){ uwRenderCategories(); return; }
+  $('#uwSuggest').style.display = 'none';
+  $('#uwBody').innerHTML = '<div class="uw-empty">查询中…</div>';
+  try{
+    const res = await fetch('/api/underwriting/search?q=' + encodeURIComponent(q));
+    const data = await res.json();
+    if(!res.ok){ $('#uwBody').innerHTML = '<div class="uw-empty">'+uwEsc(data.detail||'查询失败')+'</div>'; return; }
+    uwRenderResults(q, data);
+  }catch(e){
+    $('#uwBody').innerHTML = '<div class="uw-empty">查询失败：'+uwEsc(e.message)+'</div>';
+  }
+}
+
+function uwRenderResults(q, data){
+  const list = data.results || [];
+  if(!list.length){
+    $('#uwBody').innerHTML = `<div class="uw-empty">未找到与「${uwEsc(q)}」相关的疾病，<br>可尝试简体 / 繁体 / 英文名称，或更短的关键词。</div>`;
+    return;
+  }
+  if(list.length === 1){
+    $('#uwBody').innerHTML = uwDiseaseCard(list[0]);
+    return;
+  }
+  const catNote = data.category_match ? `<div class="uw-meta">分类「${uwEsc(data.category)}」共 ${list.length} 条：</div>` : `<div class="uw-meta">找到 ${list.length} 条匹配，点击查看详情：</div>`;
+  const rows = list.map((d,i) =>
+    `<div class="row" data-i="${i}">
+       <span><span class="nm">${uwEsc(d.name_cn)}</span><span class="en">${uwEsc(d.name_en||'')}</span></span>
+       <span class="arrow">›</span>
+     </div>`).join('');
+  $('#uwBody').innerHTML = catNote + `<div class="uw-list">${rows}</div>`;
+  $('#uwBody').querySelectorAll('.row').forEach(r => r.onclick = () => {
+    $('#uwBody').innerHTML = uwDiseaseCard(list[+r.dataset.i]) +
+      `<div class="uw-list" style="margin-top:14px;"><div class="cat-title">← 返回 ${list.length} 条结果</div></div>`;
+    const back = $('#uwBody').querySelector('.cat-title');
+    if(back) back.style.cursor = 'pointer', back.onclick = () => uwRenderResults(q, data);
+  });
+}
+
+function uwDiseaseCard(d){
+  const sec = d.sections || {};
+  const parts = [];
+  const pages = (d.pages||[]).join(', ');
+  parts.push(`
+    <div class="sec">
+      <div class="sec-title">基本信息</div>
+      <table class="w-table">
+        <tr><td style="width:32%;background:#fafafa;text-align:left;">分类</td><td style="text-align:left;">${uwEsc(d.category||'-')}</td></tr>
+        <tr><td style="background:#fafafa;text-align:left;">所属部分</td><td style="text-align:left;">Part ${uwEsc(d.part||'-')}</td></tr>
+        <tr><td style="background:#fafafa;text-align:left;">来源页码</td><td style="text-align:left;">${uwEsc(pages||'-')}</td></tr>
+        <tr><td style="background:#fafafa;text-align:left;">修订</td><td style="text-align:left;">${uwEsc(d.revision||'-')}</td></tr>
+      </table>
+    </div>`);
+  const order = ['简介','病征','治疗','考虑因素','基本核保要求'];
+  order.forEach(k => {
+    const v = sec[k];
+    if(v !== undefined && v !== null && v !== ''){
+      parts.push(`<div class="sec"><div class="sec-title">${uwEsc(k)}</div><div class="uw-txt">${uwEsc(v)}</div></div>`);
+    }
+  });
+  Object.keys(sec).forEach(k => {
+    if(order.indexOf(k) >= 0) return;
+    const v = sec[k];
+    if(v !== undefined && v !== null && v !== ''){
+      parts.push(`<div class="sec"><div class="sec-title">${uwEsc(k)}</div><div class="uw-txt">${uwEsc(v)}</div></div>`);
+    }
+  });
+  const mtx = d.matrix || {};
+  const mrows = mtx.rows || [];
+  if(mrows.length){
+    const cols = mtx.columns;
+    let note = '';
+    if(cols && cols.length){
+      note = `<div class="uw-matrix-note">核保决定涵盖：${cols.map(c=>uwEsc(c)).join(' / ')}<br>（下表「核保决定」为对应病况的整体结论，不单独归因于某一保障类别）</div>`;
+    }
+    const trs = mrows.map(r =>
+      `<tr><td style="text-align:left;width:48%;">${uwEsc(r.condition)}</td><td style="text-align:left;">${uwEsc(r.decision)}</td></tr>`).join('');
+    parts.push(`<div class="sec"><div class="sec-title">核保指引</div>${note}
+      <table class="w-table"><tr><th style="text-align:left;">条件</th><th style="text-align:left;">核保决定</th></tr>${trs}</table></div>`);
+  }
+  const notes = d.notes || [];
+  if(notes.length){
+    parts.push(`<div class="sec"><div class="sec-title">备注</div><ul class="uw-notes">${notes.map(n=>`<li>${uwEsc(n)}</li>`).join('')}</ul></div>`);
+  }
+  return `<div class="uw-card">
+    <div class="banner">${uwEsc(d.name_cn)}${d.name_en?`（${uwEsc(d.name_en)}）`:''}</div>
+    ${parts.join('')}
+    <div class="foot">
+      <div class="src">来源页码：${uwEsc(pages||'—')}</div>
+      <div class="disc">* 本指引仅供内部参考使用，不得对外（包括客户或公众人士）发放。公司保留最终核保决定权。</div>
+    </div>
+  </div>`;
+}
+
+// 搜索防抖联想
+let uwTimer = null;
+$('#uwInput').addEventListener('input', () => {
+  const v = $('#uwInput').value.trim();
+  clearTimeout(uwTimer);
+  if(!v){ $('#uwSuggest').style.display='none'; uwRenderCategories(); return; }
+  uwTimer = setTimeout(() => uwFetchSuggest(v), 250);
+});
+$('#uwInput').addEventListener('keydown', e => { if(e.key==='Enter'){ $('#uwSuggest').style.display='none'; uwSearch($('#uwInput').value); } });
+$('#uwBtn').onclick = () => { $('#uwSuggest').style.display='none'; uwSearch($('#uwInput').value); };
+
+async function uwFetchSuggest(q){
+  try{
+    const res = await fetch('/api/underwriting/search?q=' + encodeURIComponent(q));
+    if(!res.ok){ $('#uwSuggest').style.display='none'; return; }
+    const data = await res.json();
+    const box = $('#uwSuggest');
+    if(!data.results || !data.results.length){ box.style.display='none'; return; }
+    box.innerHTML = data.results.slice(0,12).map(d =>
+      `<div class="item" data-n="${uwEsc(d.name_cn)}">${uwEsc(d.name_cn)}<span class="en">${uwEsc(d.name_en||'')}</span></div>`).join('');
+    box.style.display = 'block';
+    box.querySelectorAll('.item').forEach(it => it.onclick = () => {
+      $('#uwInput').value = it.dataset.n;
+      box.style.display = 'none';
+      uwSearch(it.dataset.n);
+    });
+  }catch(e){ /* 静默 */ }
+}
+// 点击外部关闭建议
+document.addEventListener('click', e => {
+  if(!e.target.closest('.uw-searchbar')) $('#uwSuggest').style.display='none';
+});
+
+// 页面加载即加载元数据
+uwLoadMeta();
+</script>
+</body>
+</html>
