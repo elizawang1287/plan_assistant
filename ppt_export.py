@@ -24,16 +24,26 @@ SUB = RGBColor(0x33, 0x33, 0x33)       # 缴费描述普通文字
 INK0 = RGBColor(0x0D, 0x0D, 0x0D)      # 提取页标题
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 LIGHT = RGBColor(0xFA, 0xFA, 0xFA)     # 隔行填充
+BE_FILL = RGBColor(0xE6, 0xF6, 0xEC)   # 预期回本行底色（浅绿）
+BE_TEXT = RGBColor(0x0F, 0x7A, 0x3D)   # 预期回本行文字（深绿）
 
 
-def pick_rows(data_rows):
+# 各产品在「每5年」基准之外额外展示的年份：信守明天加第8年、世誉财富加第4年
+EXTRA_ROWS_YEARS = {"TRST": {8}, "PRMESP": {4}}
+# 预期回本年份（该年度退保价值达到已缴保费）：表格中整行绿色高亮 + 年度后标 ★
+BREAKEVEN_YEARS = {"TRST": 8, "PRMESP": 4}
+
+
+def pick_rows(data_rows, extra_years=None):
+    extra = set(extra_years or ())
     last_year = data_rows[-1]["year"] if data_rows else None
     has_gap = any(r.get("is_age_marker") and r["year"] != last_year for r in data_rows)
     if has_gap:
         out = [r for r in data_rows if (r.get("is_age_marker") and r["year"] > 30)
-               or (not r.get("is_age_marker") and r["year"] <= 30 and r["year"] % 5 == 0)]
+               or (not r.get("is_age_marker") and r["year"] <= 30
+                   and (r["year"] % 5 == 0 or r["year"] in extra))]
     else:
-        out = [r for r in data_rows if r["year"] % 5 == 0]
+        out = [r for r in data_rows if r["year"] % 5 == 0 or r["year"] in extra]
     last = data_rows[-1] if data_rows else None
     if last and not any(r["year"] == last["year"] for r in out):
         out.append(last)
@@ -156,14 +166,17 @@ def _add_line(slide, l, t, w, h=0.02, color=RED):
     shp.line.fill.background()
 
 
-def _footer(slide, rate=6.8, cl="人民币"):
+def _footer(slide, rate=6.8, cl="人民币", note=None):
     _box(slide, f"美元汇率：{rate}（仅供参考）", 5.1, 11.35, 2.8, size=9, color=GRAY, align=PP_ALIGN.RIGHT)
+    if note:
+        _box(slide, note, 0.52, 11.35, 4.5, size=9, color=BE_TEXT)
 
 
 def _build_table(slide, top_in, headers, data_rows, col_w, row_h=0.44,
                  two_row_header=False, hdr_size=11, hdr2_size=None,
-                 data_size=10, zebra=True, red_cols=()):
-    """通用表格。red_cols 指定本币列索引（数据用红色），zebra 控制隔行填充。"""
+                 data_size=10, zebra=True, red_cols=(), be_index=None):
+    """通用表格。red_cols 指定本币列索引（数据用红色），zebra 控制隔行填充；
+    be_index 为预期回本行的 data_rows 下标，该行整行浅绿底 + 深绿加粗。"""
     n_cols = len(headers[0])
     n_rows = len(data_rows) + (2 if two_row_header else 1)
     height = row_h * n_rows
@@ -190,10 +203,12 @@ def _build_table(slide, top_in, headers, data_rows, col_w, row_h=0.44,
         start = 1
 
     for i, row in enumerate(data_rows):
-        fill = LIGHT if (zebra and i % 2 == 0) else None
+        is_be = (be_index is not None and i == be_index)
+        fill = BE_FILL if is_be else (LIGHT if (zebra and i % 2 == 0) else None)
         for j, val in enumerate(row):
-            color = RED if j in red_cols else DARK
-            _style_cell(tbl.cell(start + i, j), val, size=data_size, color=color, fill=fill)
+            color = BE_TEXT if is_be else (RED if j in red_cols else DARK)
+            _style_cell(tbl.cell(start + i, j), val, size=data_size, color=color,
+                        bold=is_be, fill=fill)
     return tbl_shape
 
 
@@ -237,10 +252,20 @@ def add_base_slides(prs, blank, data, rate=6.8):
     b = data["basic"]
     cl = _cl(data)
     cur = b.get("currency", "美元")
-    rows = pick_rows(data["rows"])
+    rows = pick_rows(data["rows"], EXTRA_ROWS_YEARS.get(data.get("product_code")))
     last = rows[-1] if rows else None
     uy = _use_year_label(data["rows"])
-    ylab = lambda r: _ylab(r, last, uy)
+    be_year = BREAKEVEN_YEARS.get(data.get("product_code"))
+    be_index = None
+    if be_year:
+        be_index = next((i for i, r in enumerate(rows)
+                         if not r.get("is_age_marker") and r.get("year") == be_year), None)
+    def ylab(r):
+        s = _ylab(r, last, uy)
+        if be_year and not r.get("is_age_marker") and r.get("year") == be_year:
+            s += " ★"
+        return s
+    be_note = "★ 绿色行：预期回本年度（退保价值已达已缴保费）" if be_index is not None else None
     age = b.get("anb_age", "")
 
     # === Slide 1：投入方案 + 正常预期退保价值 ===
@@ -252,9 +277,10 @@ def add_base_slides(prs, blank, data, rate=6.8):
     _box(slide, "退保价值", 0.52, 1.60, 7.22, size=20, bold=True, color=DARK, align=PP_ALIGN.CENTER)
     normal_rows = [[ylab(r), _wan(r["surrender"]), _rmb(r["surrender"], rate)] for r in rows]
     _build_table(slide, 2.05, [["保单年度", cur, f"{cl}（约）"]], normal_rows,
-                 col_w=[2.62, 2.3, 2.3], row_h=0.42, hdr_size=24, data_size=18, red_cols=[2])
+                 col_w=[2.62, 2.3, 2.3], row_h=0.42, hdr_size=24, data_size=18, red_cols=[2],
+                 be_index=be_index)
     _box(slide, "剩余资金可一次性取出，或传承给下一代", 0.52, 10.95, 7.22, size=16, color=RED, align=PP_ALIGN.CENTER)
-    _footer(slide, rate, cl)
+    _footer(slide, rate, cl, be_note)
 
     # === Slide 2：乐观预期 ===
     has_opt = bool(data.get("optimistic"))
@@ -267,11 +293,12 @@ def add_base_slides(prs, blank, data, rate=6.8):
         _box(slide, "（投资回报比现时预期每年上升约 1.4%）", 0.52, 0.72, 7.22, size=16, color=DARK, align=PP_ALIGN.CENTER)
         opt_rows = [[ylab(r), _wan(opt_of(r)), _rmb(opt_of(r), rate)] for r in rows]
         _build_table(slide, 1.14, [["保单年度", cur, f"{cl}（约）"]], opt_rows,
-                     col_w=[2.62, 2.3, 2.3], row_h=0.45, hdr_size=24, data_size=18, red_cols=[2])
+                     col_w=[2.62, 2.3, 2.3], row_h=0.45, hdr_size=24, data_size=18, red_cols=[2],
+                     be_index=be_index)
         _box(slide, "长远受每年 6.5% 客户总内部回报率规限，乐观与正常情景趋于一致",
              0.52, 11.0, 7.22, size=16, color=RED, align=PP_ALIGN.CENTER)
         _box(slide, "乐观预期", 6.93, 10.76, 0.97, size=12, color=INK0, align=PP_ALIGN.LEFT)
-        _footer(slide, rate, cl)
+        _footer(slide, rate, cl, be_note)
 
     # === Slide 3：保证 vs 非保证 ===
     if has_opt:
@@ -286,10 +313,10 @@ def add_base_slides(prs, blank, data, rate=6.8):
                       ["", cur, f"{cl}（约）", cur, f"{cl}（约）"]],
                      g_rows, col_w=[1.34, 1.41, 1.24, 1.52, 1.71], row_h=0.44,
                      two_row_header=True, hdr_size=18, hdr2_size=14, data_size=14,
-                     zebra=False, red_cols=[2, 4])
+                     zebra=False, red_cols=[2, 4], be_index=be_index)
         _box(slide, "保证收益为保险公司承诺的最低现金价值，不包含非保证红利与终期分红",
              0.43, 11.0, 7.38, size=16, color=GRAY, align=PP_ALIGN.CENTER)
-        _footer(slide, rate, cl)
+        _footer(slide, rate, cl, be_note)
 
 
 def _para_box(slide, l, t, w, lines, size=12, color=DARK, align=PP_ALIGN.LEFT, h=0.5):

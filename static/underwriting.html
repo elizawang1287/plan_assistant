@@ -56,6 +56,10 @@
   .uw-matrix-note{background:#fff7e6;border:1px solid #ffd591;color:#ad6800;padding:8px 12px;
            border-radius:8px;font-size:12px;margin-bottom:8px;line-height:1.6;}
   .uw-txt{font-size:13px;line-height:1.8;color:#333;white-space:pre-wrap;word-break:break-word;}
+  .uw-item{font-size:13px;line-height:1.75;color:#333;margin:6px 0;}
+  .uw-item .uw-bullet{color:#d64541;font-weight:700;margin-right:8px;user-select:none;}
+  .uw-item .uw-item-txt{white-space:pre-wrap;word-break:break-word;}
+  .uw-note{font-size:12px;color:#888;margin:6px 0;line-height:1.7;}
   .uw-notes{margin:0;padding-left:18px;font-size:13px;line-height:1.8;color:#555;}
   .uw-notes li{margin-bottom:4px;}
   .uw-card{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.06);}
@@ -71,6 +75,34 @@
   .foot{padding:12px 18px 18px;}
   .foot .src{font-size:11px;color:#bbb;margin-bottom:8px;}
   .foot .disc{font-size:11px;color:#bbb;text-align:center;}
+
+  /* 核保矩阵：多列（条件 × 保障类别）+ 语义着色 */
+  .uw-mtx{display:block;overflow-x:auto;}
+  .uw-mtx table{min-width:100%;}
+  .uw-mtx td{text-align:left;vertical-align:top;word-break:break-word;line-height:1.55;white-space:pre-wrap;}
+  .uw-mtx th{text-align:left;}
+  .uw-mtx td.uw-cond{font-weight:600;background:#fafafa;}
+  .uw-mtx td.uw-grp{font-weight:700;background:#fbe9ea;color:var(--pr-dark);vertical-align:middle;text-align:left;white-space:pre-wrap;min-width:88px;}
+  .uw-mtx .uw-dash{color:#bbb;}
+  .w-table td.uw-dc-reject{background:#ffebee!important;color:#c62828!important;}
+  .w-table td.uw-dc-load{background:#fff3e0!important;color:#e65100!important;}
+  .w-table td.uw-dc-defer{background:#fff3e0!important;color:#e65100!important;}
+  .w-table td.uw-dc-suspend{background:#fff8e1!important;color:#a37200!important;}
+  .w-table td.uw-dc-ind{background:#eceff1!important;color:#455a64!important;}
+  .w-table td.uw-dc-ok{background:#e8f5e9!important;color:#2e7d32!important;}
+  .w-table td.uw-dc-neutral{color:#555;}
+
+  /* section 内嵌小表格 */
+  .uw-stbl{display:block;overflow-x:auto;margin-top:10px;}
+  .uw-stbl table{min-width:100%;font-size:12.5px;}
+  .uw-stbl th{background:#ffe3e6;color:var(--pr-dark);font-weight:600;text-align:left;}
+  .uw-stbl td{text-align:left;vertical-align:top;word-break:break-word;line-height:1.5;white-space:pre-wrap;}
+  .uw-stbl .uw-dash{color:#bbb;}
+  .uw-stbl td.uw-dc-reject{background:#ffebee!important;color:#c62828!important;}
+  .uw-stbl td.uw-dc-load{background:#fff3e0!important;color:#e65100!important;}
+  .uw-stbl td.uw-dc-suspend{background:#fff8e1!important;color:#a37200!important;}
+  .uw-stbl td.uw-dc-ind{background:#eceff1!important;color:#455a64!important;}
+  .uw-stbl td.uw-dc-ok{background:#e8f5e9!important;color:#2e7d32!important;}
 </style>
 </head>
 <body>
@@ -97,6 +129,26 @@
 const $ = s => document.querySelector(s);
 function uwEsc(s){
   return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// 软换行：分号后换行（section 条目 / 矩阵数据格共用；脚注不拆）
+function uwSoft(s){
+  return String(s==null?'':s).replace(/([；;])\s*/g, '$1\n');
+}
+// 条件列：分号换行 + 右括号后再换行兜底（仅条件列；) 后已是换行或紧跟 / 时不重复拆）
+function uwCond(s){
+  return uwSoft(s).replace(/\)(?![\n\/])/g, ')\n');
+}
+// 核保决定语义着色：按关键词优先级返回 css class（复合文本取最重风险）
+function uwDecClass(t){
+  const s = String(t==null?'':t);
+  if(!s.trim()) return 'uw-dc-neutral';
+  if(/拒绝|拒保|不保|不承保|不受保/.test(s)) return 'uw-dc-reject';   // 红：拒保/不保
+  if(/延期|推迟/.test(s)) return 'uw-dc-defer';                     // 橙：延期
+  if(/加价|加费|加征|加保费|\+\s*\d+\s*%|\d+\s*%/.test(s)) return 'uw-dc-load'; // 橙：加价/加费
+  if(/搁置|暂缓|暂不|观察/.test(s)) return 'uw-dc-suspend';          // 琥珀：搁置
+  if(/個別考慮|个别考虑|个别评核|酌情|逐案/.test(s)) return 'uw-dc-ind'; // 蓝灰：个别考虑
+  if(/标准|標準|承保|受保|正常|获准/.test(s)) return 'uw-dc-ok';     // 绿：标准/承保
+  return 'uw-dc-neutral';                                           // 中性
 }
 let uwCategories = [];
 let uwVersion = '';
@@ -164,8 +216,71 @@ function uwRenderResults(q, data){
   });
 }
 
+// 渲染 section 内嵌小表格数组（schema: [{cols, rows, merged:[{r,c,rs,cs}]}]）
+function uwSectionTablesHtml(tables){
+  if(!tables || !tables.length) return '';
+  return tables.map(t => {
+    const cols = t.cols || [];
+    const rows = t.rows || [];
+    const merged = t.merged || [];
+    const occ = rows.map(r => (r||[]).map(() => false));
+    let body = '';
+    rows.forEach((row, r) => {
+      let tds = '';
+      (row||[]).forEach((cell, c) => {
+        if(occ[r][c]) return;
+        let cs = 1, rs = 1;
+        merged.forEach(m => { if(m && m.r===r && m.c===c){ cs = m.cs||1; rs = m.rs||1; } });
+        for(let rr=0; rr<rs; rr++){
+          for(let cc=0; cc<cs; cc++){
+            if(rows[r+rr] && occ[r+rr]) occ[r+rr][c+cc] = true;
+          }
+        }
+        const text = cell==null ? '' : String(cell);
+        const inner = text==='' ? '<span class="uw-dash">—</span>' : uwEsc(text);
+        tds += `<td${rs>1?` rowspan="${rs}"`:''}${cs>1?` colspan="${cs}"`:''} class="${uwDecClass(text)}">${inner}</td>`;
+      });
+      body += `<tr>${tds}</tr>`;
+    });
+    const head = `<tr>${cols.map(c=>`<th>${uwEsc(c)}</th>`).join('')}</tr>`;
+    return `<div class="uw-stbl"><table class="w-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  }).join('');
+}
+
+function uwRenderSection(v){
+  if(!v) return '';
+  const out = [];
+  let cur = null;
+  (v+'').split('\n').forEach(raw => {
+    const t = raw.replace(/\s+$/,'').trim();
+    if(!t) return;
+    if(t.startsWith('▪')){                     // 黑点=条目开始
+      if(cur) out.push(cur);
+      cur = {kind:'item', bullet:true, txt:t.replace(/^▪\s*/,'')}; return;
+    }
+    if(/^\d+\./.test(t)){                      // 编号=条目开始（自带编号，不再加黑点）
+      if(cur) out.push(cur);
+      cur = {kind:'item', bullet:false, txt:t}; return;
+    }
+    if(t.startsWith('*')){                     // 脚注，独立灰字
+      if(cur) out.push(cur);
+      cur = {kind:'note', txt:t}; return;
+    }
+    // 续行：并入当前条目（同一条目内容不要拆行），与原文左列右列连排
+    if(cur){ cur.txt = cur.txt + ' ' + t; }
+    else { cur = {kind:'item', bullet:false, txt:t}; }
+  });
+  if(cur) out.push(cur);
+  return out.map(it => {
+    if(it.kind === 'note') return `<div class="uw-note">${uwEsc(it.txt)}</div>`;
+    const dot = it.bullet ? '<span class="uw-bullet">▪</span>' : '';
+    return `<div class="uw-item">${dot}<span class="uw-item-txt">${uwEsc(uwSoft(it.txt))}</span></div>`;
+  }).join('');
+}
+
 function uwDiseaseCard(d){
   const sec = d.sections || {};
+  const secTbls = d.section_tables || {};
   const parts = [];
   const pages = (d.pages||[]).join(', ');
   parts.push(`
@@ -181,29 +296,84 @@ function uwDiseaseCard(d){
   const order = ['简介','病征','治疗','考虑因素','基本核保要求'];
   order.forEach(k => {
     const v = sec[k];
-    if(v !== undefined && v !== null && v !== ''){
-      parts.push(`<div class="sec"><div class="sec-title">${uwEsc(k)}</div><div class="uw-txt">${uwEsc(v)}</div></div>`);
+    const tbl = uwSectionTablesHtml(secTbls[k]);
+    if((v !== undefined && v !== null && v !== '') || tbl){
+      parts.push(`<div class="sec"><div class="sec-title">${uwEsc(k)}</div>${v?uwRenderSection(v):''}${tbl}</div>`);
     }
   });
   Object.keys(sec).forEach(k => {
     if(order.indexOf(k) >= 0) return;
     const v = sec[k];
-    if(v !== undefined && v !== null && v !== ''){
-      parts.push(`<div class="sec"><div class="sec-title">${uwEsc(k)}</div><div class="uw-txt">${uwEsc(v)}</div></div>`);
+    const tbl = uwSectionTablesHtml(secTbls[k]);
+    if((v !== undefined && v !== null && v !== '') || tbl){
+      parts.push(`<div class="sec"><div class="sec-title">${uwEsc(k)}</div>${v?uwRenderSection(v):''}${tbl}</div>`);
     }
+  });
+  Object.keys(secTbls).forEach(k => {
+    if(sec[k] !== undefined) return;   // 该 section 已有文字渲染分支处理
+    const tbl = uwSectionTablesHtml(secTbls[k]);
+    if(tbl) parts.push(`<div class="sec"><div class="sec-title">${uwEsc(k)}</div>${tbl}</div>`);
   });
   const mtx = d.matrix || {};
   const mrows = mtx.rows || [];
   if(mrows.length){
     const cols = mtx.columns;
-    let note = '';
-    if(cols && cols.length){
-      note = `<div class="uw-matrix-note">核保决定涵盖：${cols.map(c=>uwEsc(c)).join(' / ')}<br>（下表「核保决定」为对应病况的整体结论，不单独归因于某一保障类别）</div>`;
+    // 兼容判断：存在 columns 且某行有 cells → 多列矩阵；否则走 Part II 两列回退
+    const multi = Array.isArray(cols) && cols.length>0 && mrows.some(r => r.cells && Object.keys(r.cells).length);
+    if(multi){
+      const note = `<div class="uw-matrix-note">核保决定按保障类别分列显示；原手册合并单元格跨列显示，空白格表示手册未列明。</div>`;
+      // cond_group：PDF 式两栏分组（连续同组行视觉垂直合并）
+      const useGrp = mrows.some(r => r.cond_group && String(r.cond_group).trim());
+      const head = `<tr><th style="text-align:left;"${useGrp?' colspan="2"':''}>条件</th>${cols.map(c=>`<th style="text-align:left;">${uwEsc(c)}</th>`).join('')}</tr>`;
+      // 预计算每行分组格 rowspan：>0 组首（值=跨度），0 组内后续行（跳过左栏），-1 无分组（条件格 colspan=2）
+      const grpSpan = new Array(mrows.length).fill(-1);
+      { let gi = 0;
+        while(gi < mrows.length){
+          const g = (mrows[gi].cond_group==null?'':String(mrows[gi].cond_group).trim());
+          if(!useGrp || !g){ grpSpan[gi]=-1; gi++; continue; }
+          let k=gi;
+          while(k<mrows.length && String(mrows[k].cond_group==null?'':mrows[k].cond_group).trim()===g) k++;
+          for(let t=gi;t<k;t++) grpSpan[t] = (t===gi?k-gi:0);
+          gi = k;
+        }
+      }
+      const trs = mrows.map((r, idx) => {
+        // 解析 merged 组：组首列渲染 colspan 格，组内其余列跳过
+        const skip = new Set(); const spanMap = {};
+        (r.merged||[]).forEach(grp => {
+          (grp||[]).forEach((c,i) => { if(i>0) skip.add(c); });
+          if(grp && grp.length) spanMap[grp[0]] = grp.length;
+        });
+        const tds = [];
+        cols.forEach(col => {
+          if(skip.has(col)) return;                       // 合并组内非组首列：不单独渲染
+          const text = (r.cells||{})[col];
+          const span = spanMap[col] || 1;
+          const empty = (text==null || text==='');
+          const inner = empty ? '<span class="uw-dash">—</span>' : uwEsc(uwSoft(text));
+          tds.push(`<td${span>1?` colspan="${span}"`:''} class="${uwDecClass(text)}">${inner}</td>`);
+        });
+        let condHtml = '';
+        if(!useGrp){
+          condHtml = `<td class="uw-cond" style="text-align:left;width:35%;">${uwEsc(uwSoft(r.condition))}</td>`;
+        }else if(grpSpan[idx] === -1){
+          condHtml = `<td class="uw-cond" style="text-align:left;" colspan="2">${uwEsc(uwSoft(r.condition))}</td>`;
+        }else if(grpSpan[idx] === 0){
+          condHtml = `<td class="uw-cond" style="text-align:left;">${uwEsc(uwSoft(r.condition))}</td>`;
+        }else{
+          condHtml = `<td class="uw-grp" rowspan="${grpSpan[idx]}">${uwEsc(uwSoft(r.cond_group))}</td><td class="uw-cond" style="text-align:left;">${uwEsc(uwSoft(r.condition))}</td>`;
+        }
+        return `<tr>${condHtml}${tds.join('')}</tr>`;
+      }).join('');
+      parts.push(`<div class="sec"><div class="sec-title">核保指引</div>${note}
+        <table class="w-table uw-mtx"><thead>${head}</thead><tbody>${trs}</tbody></table></div>`);
+    }else{
+      // Part II：条件 | 核保决定（双栏回退；条件列仅自然折行）
+      const trs = mrows.map(r =>
+        `<tr><td style="text-align:left;width:48%;">${uwEsc(uwSoft(r.condition))}</td><td style="text-align:left;" class="${uwDecClass(r.decision)}">${uwEsc(uwSoft(r.decision))}</td></tr>`).join('');
+      parts.push(`<div class="sec"><div class="sec-title">核保指引</div>
+        <table class="w-table"><tr><th style="text-align:left;">条件</th><th style="text-align:left;">核保决定</th></tr>${trs}</table></div>`);
     }
-    const trs = mrows.map(r =>
-      `<tr><td style="text-align:left;width:48%;">${uwEsc(r.condition)}</td><td style="text-align:left;">${uwEsc(r.decision)}</td></tr>`).join('');
-    parts.push(`<div class="sec"><div class="sec-title">核保指引</div>${note}
-      <table class="w-table"><tr><th style="text-align:left;">条件</th><th style="text-align:left;">核保决定</th></tr>${trs}</table></div>`);
   }
   const notes = d.notes || [];
   if(notes.length){

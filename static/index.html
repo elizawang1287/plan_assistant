@@ -87,6 +87,8 @@
   .w-table td{border:1px solid var(--line);padding:8px 6px;text-align:center;font-variant-numeric:tabular-nums;}
   .w-table tr:nth-child(even) td{background:#fafafa;}
   .w-table tr.age-row td{background:#fff3e0 !important;color:#c65900;font-weight:600;}
+  .w-table tr.be-row td{background:#e6f6ec !important;color:#0f7a3d;font-weight:700;}
+  .be-tag{display:inline-block;margin-left:6px;padding:0 6px;border-radius:9px;background:#0f7a3d;color:#fff;font-size:10px;font-weight:600;line-height:16px;vertical-align:middle;white-space:nowrap;}
   .w-rate{font-size:11px;color:#bbb;text-align:right;margin-top:8px;}
 
   /* 摘要编辑 */
@@ -273,18 +275,23 @@ function setGroup(i){
   render(g.variants[0], g.variants[0]._fname);
 }
 
-function pickRows(rows){
+// 各产品在「每5年」基准之外额外指定要展示的年份：信守明天加第8年、世誉财富加第4年
+const EXTRA_ROWS_YEARS = {TRST:[8], PRMESP:[4]};
+// 预期回本年份（该保单年度退保价值达到已缴保费）：表格中绿色高亮标注「预期回本」
+const BREAKEVEN_YEARS = {TRST:8, PRMESP:4};
+function pickRows(rows, productCode){
+  const extra = new Set(EXTRA_ROWS_YEARS[productCode] || []);
   // 判断是否为断档表：岁数标记行不在最后一行才算（完整表最后一行也是101岁标记）
   const lastYear = rows[rows.length-1].year;
   const hasGapMarkers = rows.some(r => r.is_age_marker && r.year !== lastYear);
   let out;
   if (hasGapMarkers) {
-    // 断档表：30年前每5年，30年后只取岁数标记行
+    // 断档表：30年前每5年（含指定年），30年后只取岁数标记行
     out = rows.filter(r => (r.is_age_marker && r.year > 30)
-           || (!r.is_age_marker && r.year <= 30 && r.year % 5 === 0));
+           || (!r.is_age_marker && r.year <= 30 && (r.year % 5 === 0 || extra.has(r.year))));
   } else {
-    // 完整年表：每5年一直取到最后
-    out = rows.filter(r => r.year % 5 === 0);
+    // 完整年表：每5年（含指定年）一直取到最后
+    out = rows.filter(r => r.year % 5 === 0 || extra.has(r.year));
   }
   const last = rows[rows.length-1];
   if (last && !out.find(r=>r.year===last.year)) out.push(last);
@@ -306,7 +313,7 @@ function render(data, fname){
   const cur = b.currency || '美元';
   const rate = parseFloat($('#rate').value) || 6.8;
   const curLabel = document.querySelector('input[name="cur"]:checked').value === 'HKD' ? '港币' : '人民币';
-  const rows = pickRows(data.rows);
+  const rows = pickRows(data.rows, data.product_code);
   const lastYr = rows.length ? rows[rows.length-1].year : null;
   // 金额缩写：>=1亿显示"X.X亿"，否则"X.X万"；整亿/整万不带小数；直接舍去（不四舍五入）
   const fmtUnit = v => {
@@ -325,9 +332,11 @@ function render(data, fname){
   let annualCount = 0;
   for (let y=1; y<=25; y++) if (yrSet.has(y)) annualCount++;
   const useYearLabel = annualCount >= 10;
+  const beYear = BREAKEVEN_YEARS[data.product_code] || null;
+  const isBE = r => !!beYear && !r.is_age_marker && r.year === beYear;
   const ylab = r => {
     if (r.is_age_marker) return `${r.age}岁`;
-    return `第${r.year}年`;
+    return `第${r.year}年` + (isBE(r) ? '<span class="be-tag">预期回本</span>' : '');
   };
 
   const investRow = `
@@ -337,7 +346,7 @@ function render(data, fname){
         <td>${b.total_premium?fmt(b.total_premium):'-'}</td></tr>`;
 
   // 正常预期退保价值表（PPT：年度|美元|人民币）
-  const rowCls = r => r.is_age_marker ? ' class="age-row"' : '';
+  const rowCls = r => r.is_age_marker ? ' class="age-row"' : (isBE(r) ? ' class="be-row"' : '');
   const normalHtml = rows.map(r=>
     `<tr${rowCls(r)}><td>${ylab(r)}</td><td>${wU(r.surrender)}</td><td>${wR(r.surrender)}</td></tr>`).join('');
 
