@@ -644,6 +644,8 @@ def add_withdrawal_slide(prs, blank, data, rate=6.8, label=None):
     wrows = [x for x in w["rows"] if x["withdrawal"] > 0]
     n_years = len(wrows)
     wlast = wrows[-1]
+    all_rows = w["rows"]                  # 剩余价值表：用全量行（含停止提取后的滚存行到101岁）
+    wall = all_rows[-1]
     annual = w["annual_withdrawal"]
     total = wlast["accumulated"]
     # 分阶段：连续年份且金额相同合并为一段
@@ -690,18 +692,28 @@ def add_withdrawal_slide(prs, blank, data, rate=6.8, label=None):
         _box(slide, "提取后账户剩余的总现金价值", 2.21, y2, 3.85, size=20, bold=True, color=DARK, align=PP_ALIGN.CENTER)
         _add_line(slide, 0.59, y2 - 0.07, 7.08)
         table_y = y2 + 0.45
-    # 剩余价值关键年份：首、尾、每5年、每段边界
+    # 剩余价值关键年份：首、尾（101岁）、每5年、每段边界
     bd = {s["start"] for s in segs} | {s["end"] for s in segs}
-    key = [x for x in wrows if x["year"] == w["start_year"] or x["year"] % 5 == 0 or x == wrows[-1] or x["year"] in bd]
-    rem_rows = [[f"第 {x['year']} 年",
+    key = [x for x in all_rows if x["year"] == w["start_year"] or x["year"] % 5 == 0
+           or x is all_rows[-1] or x["year"] in bd]
+    def _wlabel(x):
+        if x is all_rows[-1] and x.get("age"):
+            return f"第 {x['year']} 年（{x['age']} 岁）"
+        return f"第 {x['year']} 年"
+    rem_rows = [[_wlabel(x),
                  _wan(x["surrender"]), _rmb(x["surrender"], rate)] for x in key]
     _build_table(slide, table_y, [["保单年度", cur + "（剩余价值）", f"{cl}（约）"]], rem_rows,
                  col_w=[2.62, 2.3, 2.3], row_h=0.40, hdr_size=18, data_size=14, red_cols=[2])
-    _richbox(slide, 0.59, 11.0, 7.15, 16,
-             [("领完一辈子，账户还剩近 ", DARK, False),
-              (_wan(wlast["surrender"]) + " ", RED, False),
-              ("继续传承给下一代", DARK, False)],
-             align=PP_ALIGN.CENTER)
+    if wall["year"] > wlast["year"]:
+        narr = [(f"提取至{wlast['age']}岁（第{wlast['year']}年）后不再领取，账户继续滚存，"
+                 f"至{wall['age']}岁账户还剩近 ", DARK, False),
+                (_wan(wall["surrender"]) + " ", RED, True),
+                ("继续传承给下一代", DARK, False)]
+    else:
+        narr = [("领完一辈子，账户还剩近 ", DARK, False),
+                (_wan(wall["surrender"]) + " ", RED, True),
+                ("继续传承给下一代", DARK, False)]
+    _richbox(slide, 0.59, 11.0, 7.15, 16, narr, align=PP_ALIGN.CENTER)
     _footer(slide, rate, cl)
 
 

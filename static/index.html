@@ -388,7 +388,9 @@ function render(data, fname){
     const vcur = v.basic.currency || cur;
     const wrows = w.rows.filter(r => r.withdrawal > 0);
     const nYears = wrows.length;
-    const wlast = wrows[wrows.length-1];
+    const wlast = wrows[wrows.length-1];        // 最后一个提取年
+    const allRows = w.rows;                      // 剩余价值表：用全量行（含停止提取后的滚存行，直到101岁）
+    const wall = allRows[allRows.length-1];      // 最后一年（通常101岁）
     const annual = w.annual_withdrawal;
     const total = wlast.accumulated;
     // 分阶段：连续年份且金额相同合并为一段
@@ -414,9 +416,9 @@ function render(data, fname){
     // 剩余价值关键年份：首、尾、每5年、每段边界
     const bd = new Set();
     segs.forEach(s => { bd.add(s.start); bd.add(s.end); });
-    const keyRows = wrows.filter((r,i) => i===0 || i===wrows.length-1 || r.year % 5 === 0 || bd.has(r.year));
+    const keyRows = allRows.filter((r,i) => i===allRows.length-1 || r.year % 5 === 0 || bd.has(r.year) || r.year===w.start_year);
     const kHtml = keyRows.map(r =>
-      `<tr><td>第${r.year}年${r.year===wlast.year?(`（${r.age}岁）`):''}</td>
+      `<tr><td>第${r.year}年${r.year===wall.year?(`（${r.age}岁）`):''}</td>
         <td>${wU(r.surrender)}</td>
         <td>${fmtW(r.surrender)}</td></tr>`).join('');
     return `
@@ -432,7 +434,9 @@ function render(data, fname){
         ${kHtml}
       </table>
       <div class="narr" style="margin-top:10px;">
-        领完一辈子，账户还剩近 <b>${wU(wlast.surrender)}</b>（约 ${fmtW(wlast.surrender)}${curLabel}）继续传承给下一代。
+        ${wall.year > wlast.year
+          ? `提取至${wlast.age}岁（第${wlast.year}年）后不再领取，账户继续滚存，至${wall.age}岁账户还剩近 <b>${wU(wall.surrender)}</b>（约 ${fmtW(wall.surrender)}${curLabel}）继续传承给下一代。`
+          : `领完一辈子，账户还剩近 <b>${wU(wall.surrender)}</b>（约 ${fmtW(wall.surrender)}${curLabel}）继续传承给下一代。`}
       </div>
       <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
     </div>`;
@@ -474,8 +478,15 @@ function render(data, fname){
     `${b.premium_type}保费${fmt(b.annual_premium)}${b.pay_years>1?('，共'+b.pay_years+'期'):''}，合计保费${fmt(b.total_premium)}${cur}。`;
   const w = data.withdrawal;
   if (w) {
-    const wlast = w.rows[w.rows.length-1];
-    summary += `按本方案，从第${w.start_year}年起每年提取${fmt(w.annual_withdrawal)}${cur}，累计提取${fmt(wlast.accumulated)}${cur}；至${wlast.age}岁提取后预计退保价值${fmt(wlast.surrender)}${cur}。`;
+    const wr = w.rows.filter(r=>r.withdrawal>0);
+    const wend = wr[wr.length-1] || w.rows[w.rows.length-1];
+    const wall = w.rows[w.rows.length-1];
+    summary += `按本方案，从第${w.start_year}年起每年提取${fmt(w.annual_withdrawal)}${cur}，累计提取${fmt(wall.accumulated)}${cur}；`;
+    if (wall.year > wend.year) {
+      summary += `提取至${wend.age}岁（共${wr.length}年）后停止领取，账户滚存至${wall.age}岁预计退保价值${fmt(wall.surrender)}${cur}。`;
+    } else {
+      summary += `至${wall.age}岁提取后预计退保价值${fmt(wall.surrender)}${cur}。`;
+    }
   } else {
     summary += (y10?`第10个保单年度（${y10.age}岁）预计退保价值${fmt(y10.surrender)}${cur}；`:'')+
     (y20?`第20个保单年度（${y20.age}岁）预计退保价值${fmt(y20.surrender)}${cur}；`:'')+
