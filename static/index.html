@@ -61,8 +61,9 @@
   .foot .disc{font-size:11px;color:#bbb;text-align:center;}
   .adv{margin-bottom:18px;padding:10px 12px;background:#fff;border:1px solid #f3d9d7;border-radius:8px;}
   .adv-title{font-size:15px;font-weight:700;color:#d0342c;line-height:1.4;margin:0 0 8px;padding:0 0 8px 10px;border-left:4px solid #d0342c;}
-  .adv ul{margin:6px 0 0;padding-left:18px;font-size:13px;line-height:1.9;color:#333;}
-  .adv li{margin-bottom:3px;word-break:break-word;overflow-wrap:anywhere;}
+  .adv ul{margin:6px 0 0;padding-left:0;font-size:13px;line-height:1.9;color:#333;list-style:none;}
+  .adv li{display:block;list-style:none;position:relative;padding-left:16px;margin-bottom:3px;word-break:break-word;overflow-wrap:anywhere;}
+  .adv li::before{content:"•";position:absolute;left:0;top:0;color:#333;font-weight:bold;}
   .adv-dim{margin-bottom:10px;font-size:13px;line-height:1.9;color:#333;word-break:break-word;overflow-wrap:anywhere;}
   .adv-dim:last-child{margin-bottom:0;}
   .adv-kw{color:#d0342c;font-weight:700;}
@@ -302,7 +303,7 @@ function pickRows(rows, productCode){
 
 let lastData = null;
 function render(data, fname){
-  if (data.product_code === 'CIM3') { renderCIM3(data, fname); return; }
+  if (data.product_code === 'CIM3' || data.product_code === 'CIE3') { renderCIM3(data, fname); return; }
   if (data.product_code === 'ENCASH') { renderENCASH(data, fname); return; }
   lastData = data;
   $('#warn').style.display = data.warning ? 'block':'none';
@@ -506,6 +507,7 @@ function renderCIM3(data, fname){
   $('#toolbar').style.display='flex';
   const b = data.basic;
   const cur = b.currency || '美元';
+  const isCie3 = data.product_code === 'CIE3';
   const rate = parseFloat($('#rate').value) || 6.8;
   const curLabel = document.querySelector('input[name="cur"]:checked').value === 'HKD' ? '港币' : '人民币';
   // 行选择与标签：完整逐年表（有补充说明）→ 每5年+末行，全部按「第X年」；
@@ -524,19 +526,34 @@ function renderCIM3(data, fname){
   const ylab = r => hasGap ? (r.is_age_marker ? `${r.age}岁` : `第${r.year}年`) : `第${r.year}年`;
   const money = (label, v) => `<tr><td>${label}</td><td>${v!=null?fmt(v):'-'}</td><td>${v!=null?fmtW(v):'-'}</td></tr>`;
   const basicHtml = `
-    <tr><th>项目</th><th>${cur}</th><th>${curLabel}</th></tr>
-    ${money('基本保额', b.basic_amount)}
-    ${money('首10年赠送保障（升级保障）', b.gift10)}
-    ${money('总保障额', b.total_amount)}
-    <tr><td>保障期</td><td colspan="2">${b.coverage||'终身'}</td></tr>
-    <tr><td>供款期</td><td colspan="2">${b.pay_years? (b.pay_years+'年') : '-'}</td></tr>
-    ${money('年保费', b.annual_premium)}
-    ${money('总保费', b.total_premium)}
+    <table class="w-table" style="margin-bottom:10px;">
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>受保人</td><td>${b.anb_age}岁 ${b.gender||''}${b.smoker?('（'+b.smoker+'）'):''}</td></tr>
+      <tr><td>保单货币</td><td>${cur}</td></tr>
+      <tr><td>保障期</td><td>${b.coverage||'终身'}</td></tr>
+      <tr><td>供款期</td><td>${b.pay_years? (b.pay_years+'年') : '-'}</td></tr>
+    </table>
+    <table class="w-table">
+      <tr><th>项目</th><th>${cur}</th><th>${curLabel}</th></tr>
+      ${money('基本保额', b.basic_amount)}
+      ${money('首10年赠送保障（升级保障）', b.gift10)}
+      ${money('总保障额', b.total_amount)}
+      ${money('年保费', b.annual_premium)}
+      ${money('总保费', b.total_premium)}
+    </table>
   `;
   const giftText = `${wU(b.basic_amount)}×9次`;
   const annuityText = Math.round((data.basic.basic_amount || 0) * 0.06).toLocaleString() + '/年';
   const lifeText = `${wU(b.basic_amount)}美元`;
-  const protHtml = rows.map(r => `
+  const protHtml = (isCie3
+    ? rows.map(r => `
+    <tr${rowCls(r)}>
+      <td>${ylab(r)}</td>
+      <td>${wU(r.paid)}</td>
+      <td>${wU(r.death_total)}</td>
+      <td>${wU(r.surrender)}</td>
+    </tr>`).join('')
+    : rows.map(r => `
     <tr${rowCls(r)}>
       <td>${ylab(r)}</td>
       <td>${wU(r.paid)}</td>
@@ -545,7 +562,7 @@ function renderCIM3(data, fname){
       <td>${annuityText}</td>
       <td>${lifeText}</td>
       <td>${wU(r.surrender)}</td>
-    </tr>`).join('');
+    </tr>`).join(''));
   const srHtml = rows.map(r => {
     const s = (r.simple_pct != null && r.simple_pct > 0) ? (r.simple_pct+'%') : '/';
     const c = (r.compound_pct != null && r.compound_pct > 0) ? (r.compound_pct+'%') : '/';
@@ -577,7 +594,25 @@ function renderCIM3(data, fname){
   // 保障明细表（参考图2：保障内容 | 人民币 | 美元），按保障类型分组
   const _b = data.basic;
   const _G = _b.basic_amount || 0;
-  const benG = [
+  const benG = isCie3 ? [
+    {g:"危疾保障", rows:[
+      {c:"第一次严重疾病理赔", n:"覆盖56种严重疾病；首10年含额外危疾加护保III，总保障150%（基本保额＋赠送保额＋红利）", v:(_G+(_b.gift10||0))},
+      {c:"严重疾病延伸保障", n:"癌症额外2次、心脏病/中风额外2次，每次赔付100%保额", v:_G*2},
+      {c:"癌症治疗额外保障", n:"持续治疗期间按当时保额60%赔付", v:_G*0.6},
+    ]},
+    {g:"早期与深切治疗", rows:[
+      {c:"早期严重疾病保障", n:"61种早期严重疾病，按当时保额20%~25%赔付，最多索偿3次", v:_G*0.25},
+      {c:"深切治疗ICU保障", n:"连续入住ICU三日或以上，获赔当时保额20%（境外10%）", v:_G*0.2},
+    ]},
+    {g:"家庭与服务", rows:[
+      {c:"家人同行额外保障", n:"两位家庭成员一同投保，首10年赠送50%额外人寿保障", v:_G*0.5},
+      {c:"安心医国际二次诊疗", n:"一站式医疗咨询，含国际医疗专家意见及海外医疗礼宾服务", v:null},
+    ]},
+    {g:"保费与退保", rows:[
+      {c:"保费豁免", n:"确诊严重疾病后豁免日后所有保费；早期疾病理赔后豁免下一年保费", v:null},
+      {c:"退保提取", n:"连本带利取回保单现金价值（见退保价值表）", v:null},
+    ]},
+  ] : [
     {g:"危疾保障", rows:[
       {c:"第一次重疾理赔", n:"覆盖127种病况（49早期+56严重+15儿童重疾+7儿童次级）；首10年升级保障总额150%", v:(_G+(_b.gift10||0))},
       {c:"重症多次理赔", n:"延伸保障最高累计900%保额、每笔100%——癌症2次、心脏病/中风2次、脑退化·帕金森1次、主要器官2次、其他2次（最多9次）", v:_G*9},
@@ -605,14 +640,18 @@ function renderCIM3(data, fname){
     <div class="banner">${data.product_name}</div>
     <div class="sec">
       <div class="sec-title">基础信息</div>
-      <table class="w-table">${basicHtml}</table>
+      <div>${basicHtml}</div>
       <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
     </div>
     <div class="sec">
       <div class="sec-title">基本保障</div>
-      <div class="w-small" style="margin-bottom:8px;">*再次重疾保障每次100%基本保额、最多9次；严重脑退化症及帕金森病终身年金每年基本保额6%；人寿延伸保障100,000美元（严重疾病理赔后、86岁前身故）。</div>
+      <div class="w-small" style="margin-bottom:8px;">${isCie3
+        ? '*严重疾病延伸保障：癌症额外2次、心脏病/中风额外2次，每次100%保额；癌症治疗保障60%；首10年含额外危疾加护保III。'
+        : '*再次重疾保障每次100%基本保额、最多9次；严重脑退化症及帕金森病终身年金每年基本保额6%；人寿延伸保障100,000美元（严重疾病理赔后、86岁前身故）。'}</div>
       <table class="w-table">
-        <tr><th>保单年度</th><th>已缴保费</th><th>首次重疾或身故</th><th>再次重疾(×9)</th><th>严重脑退化及帕金森年金</th><th>人寿延伸保障</th><th>退保价值</th></tr>
+        ${isCie3
+          ? `<tr><th>保单年度</th><th>已缴保费</th><th>身故或严重疾病保障</th><th>退保价值</th></tr>`
+          : `<tr><th>保单年度</th><th>已缴保费</th><th>首次重疾或身故</th><th>再次重疾(×9)</th><th>严重脑退化及帕金森年金</th><th>人寿延伸保障</th><th>退保价值</th></tr>`}
         ${protHtml}
       </table>
     </div>
@@ -676,12 +715,19 @@ function renderENCASH(data, fname){
   const ylab = r => hasGap ? (r.is_age_marker ? `${r.age}岁` : `第${r.year}年`) : `第${r.year}年`;
   const money = (label, v) => `<tr><td>${label}</td><td>${v!=null?fmt(v):'-'}</td><td>${v!=null?fmtW(v):'-'}</td></tr>`;
   const basicHtml = `
-    <tr><th>项目</th><th>${cur}</th><th>${curLabel}（约）</th></tr>
-    ${money('基本保额', b.basic_amount)}
-    <tr><td>保障期</td><td colspan="2">${b.coverage||'终身'}</td></tr>
-    <tr><td>供款期</td><td colspan="2">${b.pay_years? (b.pay_years+'年') : '-'}</td></tr>
-    ${money('年保费', b.annual_premium)}
-    ${money('总保费', b.total_premium)}
+    <table class="w-table" style="margin-bottom:10px;">
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>受保人</td><td>${b.anb_age}岁 ${b.gender||''}${b.smoker?('（'+b.smoker+'）'):''}</td></tr>
+      <tr><td>保单货币</td><td>${cur}</td></tr>
+      <tr><td>保障期</td><td>${b.coverage||'终身'}</td></tr>
+      <tr><td>供款期</td><td>${b.pay_years? (b.pay_years+'年') : '-'}</td></tr>
+    </table>
+    <table class="w-table">
+      <tr><th>项目</th><th>${cur}</th><th>${curLabel}（约）</th></tr>
+      ${money('基本保额', b.basic_amount)}
+      ${money('年保费', b.annual_premium)}
+      ${money('总保费', b.total_premium)}
+    </table>
   `;
   // 保障与退保表：已缴保费 / 人寿保障 / 健康退保领取
   const valHtml = rows.map(r => `
@@ -750,7 +796,7 @@ function renderENCASH(data, fname){
     <div class="banner">${data.product_name}</div>
     <div class="sec">
       <div class="sec-title">基础信息</div>
-      <table class="w-table">${basicHtml}</table>
+      <div>${basicHtml}</div>
       <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
     </div>
     <div class="sec">
