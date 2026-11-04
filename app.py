@@ -61,10 +61,28 @@ async def export_ppt(payload: dict = None):
     try:
         rate = float((payload or {}).get("rate", 6.8))
         buf = ppt_export.build_pptx(payload, rate)
+        # 生成文件名：储蓄类=客户+年保费+年数；重疾/医疗类=客户+保额
+        b = (payload or {}).get("basic", {}) or {}
+        age = b.get("anb_age", "")
+        gender = b.get("gender", "")
+        prod = (payload or {}).get("product_code", "")
+        savings_codes = {"PRMESP", "TRST", "PHOR", "LFRE2", "PLP2", "ENCASH", "EGI", "EGIP"}
+        if prod in savings_codes:
+            prem = b.get("annual_premium", 0) or 0
+            years = b.get("pay_years", "") or ""
+            prem_wan = round(prem / 10000, 1) if prem else 0
+            fname = f"{age}岁{gender}-年缴{prem_wan}万-{years}年.pptx"
+        else:
+            sa = b.get("sum_assured", 0) or 0
+            sa_wan = round(sa / 10000, 1) if sa else 0
+            fname = f"{age}岁{gender}-保额{sa_wan}万.pptx"
+        # 文件名编码（中文）
+        from urllib.parse import quote
+        fname_enc = quote(fname)
         return StreamingResponse(
             buf,
             media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            headers={"Content-Disposition": 'attachment; filename="plan.pptx"'},
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fname_enc}"},
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导出PPT失败：{e}")
@@ -81,10 +99,27 @@ async def export_combined(payload: dict = None):
         for v in variants:
             v["curLabel"] = cl
         buf = ppt_export.build_combined_pptx(base, variants, rate)
+        # 生成文件名
+        b = base.get("basic", {}) or {}
+        age = b.get("anb_age", "")
+        gender = b.get("gender", "")
+        prod = base.get("product_code", "")
+        savings_codes = {"PRMESP", "TRST", "PHOR", "LFRE2", "PLP2", "ENCASH", "EGI", "EGIP"}
+        if prod in savings_codes:
+            prem = b.get("annual_premium", 0) or 0
+            years = b.get("pay_years", "") or ""
+            prem_wan = round(prem / 10000, 1) if prem else 0
+            fname = f"{age}岁{gender}-年缴{prem_wan}万-{years}年-多提取方案.pptx"
+        else:
+            sa = b.get("sum_assured", 0) or 0
+            sa_wan = round(sa / 10000, 1) if sa else 0
+            fname = f"{age}岁{gender}-保额{sa_wan}万-多提取方案.pptx"
+        from urllib.parse import quote
+        fname_enc = quote(fname)
         return StreamingResponse(
             buf,
             media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            headers={"Content-Disposition": 'attachment; filename="plan.pptx"'},
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fname_enc}"},
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导出组合PPT失败：{e}")
