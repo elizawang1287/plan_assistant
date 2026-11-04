@@ -746,6 +746,195 @@ def parse_pdf(pdf_path):
     }
 
 
+# ============ 家庭保单规划：快速基本信息解析 ============
+
+FAMILY_PRODUCT_NAMES = {
+    "PRMESP": "世誉财富保险计划",
+    "TRST": "信守明天多元货币",
+    "CIM3": "诚保一生危疾",
+    "CIE3": "守护健康危疾加护保III",
+    "ENCASH": "加护一生住院现金",
+    "PLT20": "守护家人定期寿险",
+    "PLT": "定期寿险",
+    "CIT2": "守护健康危疾定期保II",
+    "CIT": "定期危疾",
+    "CPER": "特选危疾治疗保",
+    "MCVIP": "MCVIP",
+    "LFRE2": "自主未来II",
+    "PLP2": "美好人寿II",
+}
+
+FAMILY_PRODUCT_CATEGORY = {
+    "PRMESP": "储蓄/退休",
+    "TRST": "储蓄/退休",
+    "CIM3": "危疾",
+    "CIE3": "危疾",
+    "CIT2": "定期危疾",
+    "CIT": "定期危疾",
+    "ENCASH": "住院现金",
+    "PLT20": "定期寿险",
+    "PLT": "定期寿险",
+    "CPER": "医疗",
+    "MCVIP": "高端医疗",
+    "LFRE2": "储蓄/寿险",
+    "PLP2": "寿险",
+}
+
+
+def detect_product_family(text):
+    """家庭规划用：更宽松的产品代码识别。"""
+    for code, _ in FAMILY_PRODUCT_NAMES.items():
+        if code in text:
+            return code
+    # 关键词兜底
+    if "世譽財富" in text or "世誉财富" in text: return "PRMESP"
+    if "信守明天" in text or "信信守" in text: return "TRST"
+    if "誠保一生" in text or "诚保一生" in text: return "CIM3"
+    if "守護健康" in text or "守护健康" in text:
+        if "加護保" in text or "加护保" in text: return "CIE3"
+        return "CIT2"
+    if "住院現金" in text or "住院现金" in text: return "ENCASH"
+    if "守護家人" in text or "守护家人" in text: return "PLT20"
+    if "尚賓" in text or "尚宾" in text: return "MCVIP"
+    if "自主未來" in text or "自主未来" in text: return "LFRE2"
+    if "美好人壽" in text or "美好人寿" in text: return "PLP2"
+    return "UNKNOWN"
+
+
+def parse_basic_fast(pdf_path):
+    """快速解析：只提取前6页基本信息，不解析退保价值表。
+    返回 {product_code, product_name, category, age, gender, currency,
+           sum_assured, annual_premium, pay_years, total_premium, filename}
+    """
+    doc = fitz.open(pdf_path)
+    # 扫描前6页（封面+空白页+摘要页通常在前6页内）
+    n = min(6, len(doc))
+    text = "\n".join(doc[i].get_text() for i in range(n))
+    doc.close()
+
+    product = detect_product_family(text)
+    product_name = FAMILY_PRODUCT_NAMES.get(product, product)
+
+    # MCVIP 区分计划一/计划二
+    if product == "MCVIP":
+        if "計劃一" in text or "计划一" in text:
+            product_name += "（计划一）"
+        elif "計劃二" in text or "计划二" in text:
+            product_name += "（计划二）"
+
+    info = {
+        "product_code": product,
+        "product_name": product_name,
+        "category": FAMILY_PRODUCT_CATEGORY.get(product, "其他"),
+        "age": None, "gender": None, "currency": None,
+        "sum_assured": None, "annual_premium": None,
+        "pay_years": None, "total_premium": None,
+        "last_surrender_value": None,  # 最后剩余价值（储蓄险用）
+    }
+
+    # 年龄（繁简都支持）
+    m = re.search(r"翌年[歲岁][（(]ANB[)）][:：]\s*(\d+)\s*[歲岁]", text)
+    if not m:
+        m = re.search(r"ANB\s*[:：]?\s*(\d+)\s*[歲岁]", text)
+    info["age"] = int(m.group(1)) if m else None
+
+    # 性别（繁简都支持）
+    m = re.search(r"性[別别][：:]\s*(男|女)", text)
+    info["gender"] = m.group(1) if m else None
+
+    # 货币（繁简都支持）
+    m = re.search(r"保[單单][貨货][幣币]\s*[:：]\s*([A-Za-z\u4e00-\u9fff]+)", text)
+    if m:
+        cur = m.group(1)
+        info["currency"] = "HKD" if "港" in cur else ("USD" if "美" in cur else cur)
+
+    # 年缴保费（最可靠：找"投保時每年總保費"或"投保時整付總保費"后面的数字）
+    annual_premium = None
+    for pat in [
+        r"投保[時时]每年[總总][保保][費费]\s*\n?([\d,]+\.?\d*)",
+        r"投保[時时]整付[總总][保保][費费]\s*\n?([\d,]+\.?\d*)",
+        r"投保[時时]每年[保保][費费]\s*\n?([\d,]+\.?\d*)",
+        r"投保[時时]整付[保保][費费]\s*\n?([\d,]+\.?\d*)",
+    ]:
+        m = re.search(pat, text)
+        if m:
+            annual_premium = _to_num(m.group(1))
+            break
+    info["annual_premium"] = annual_premium
+
+    # 纯储蓄险产品（保额不适用）：TRST、PRMESP
+    # LFRE2 是有保额的（定期寿险+储蓄），需要提取保额
+    savings_no_sum = {"TRST", "PRMESP"}
+    if product in savings_no_sum:
+        sum_assured = None
+    else:
+        # 保额：找产品名后面的数字，排除年缴和供款期
+        sum_assured = None
+        m = re.search(r"\(((" + "|".join(FAMILY_PRODUCT_NAMES.keys()) + r"))\)\s*\n?([\d,]+\.?\d*)", text)
+        if m:
+            info["product_code"] = m.group(1)
+            info["product_name"] = FAMILY_PRODUCT_NAMES.get(m.group(1), m.group(1))
+            info["category"] = FAMILY_PRODUCT_CATEGORY.get(m.group(1), "其他")
+            # 产品名后面的所有数字
+            tail = text[m.end():m.end()+500]
+            numbers = re.findall(r"([\d,]+\.?\d*)", tail)
+            for num_str in numbers:
+                val = _to_num(num_str)
+                if not val:
+                    continue
+                # 排除年缴（如果年缴找到了，跳过和它一样的数字）
+                if annual_premium and abs(val - annual_premium) < 1:
+                    continue
+                # 排除供款期（X 年）
+                if val < 100:  # 供款期一般 < 100
+                    continue
+                # 剩下的大数字就是保额
+                if val > 50000:
+                    sum_assured = val
+                    break
+    info["sum_assured"] = sum_assured
+
+    # 供款年期（繁简都支持）
+    # PDF文本里"保費供款年期"是表头，值在后面几行，不是同一行
+    pay_years = None
+    for line_pat in [r"保[費费]供款年期", r"保费供款年期"]:
+        m = re.search(line_pat, text)
+        if m:
+            # 从表头位置往后取500字符
+            tail = text[m.end():m.end()+500]
+            # 只找"数字 年"的模式（避免把年缴保费的数字当供款期）
+            m2 = re.search(r"(\d+)\s*[年年]", tail)
+            if m2:
+                val = int(m2.group(1))
+                if val <= 50:  # 供款期一般 <= 50年
+                    pay_years = val
+                    break
+    # 兜底：一次整付产品（PRMESP）供款期是1年
+    if not pay_years:
+        if product in ("PRMESP",):
+            pay_years = 1
+    info["pay_years"] = pay_years
+
+    # 总保费
+    if info["annual_premium"] and info["pay_years"]:
+        info["total_premium"] = info["annual_premium"] * info["pay_years"]
+    elif info["annual_premium"]:
+        info["total_premium"] = info["annual_premium"]
+
+    # 储蓄险产品：提取最后剩余价值
+    savings_products = {"TRST", "PRMESP", "LFRE2", "PLP2"}
+    if product in savings_products:
+        try:
+            rows = parse_surrender_table(text, info.get("age"), info.get("total_premium"), product=product)
+            if rows:
+                last_row = rows[-1]
+                info["last_surrender_value"] = last_row.get("guaranteed_cv") or last_row.get("total_cv")
+        except Exception:
+            pass
+
+    return info
+
+
 if __name__ == "__main__":
     import sys, json
     r = parse_pdf(sys.argv[1])

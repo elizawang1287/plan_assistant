@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>续保提醒 · 计划书助手</title>
+<style>
+  :root{
+    --pr:#e60012; --pr-dark:#c00010; --ink:#222; --gray:#888;
+    --line:#eee; --bg:#f5f6f8; --green:#0a7a3d; --blue:#1f5fbf;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--ink);}
+  header{background:#fff;padding:14px 22px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);}
+  header a{text-decoration:none;color:var(--gray);font-size:13px;}
+  header .logo{font-size:18px;font-weight:700;color:var(--pr);}
+  header .sub{font-size:12px;color:var(--gray);}
+  .wrap{max-width:1100px;margin:20px auto;padding:0 16px;}
+
+  .drop{border:2px dashed #cfd3da;border-radius:12px;background:#fff;padding:36px 20px;
+        text-align:center;color:var(--gray);cursor:pointer;transition:.2s;}
+  .drop:hover,.drop.over{border-color:var(--pr);color:var(--pr);background:#fff5f6;}
+  .drop b{color:var(--ink);}
+
+  .rate-bar{display:flex;gap:16px;margin:16px 0;align-items:center;flex-wrap:wrap;
+            background:#fff;padding:12px 16px;border-radius:10px;border:1px solid var(--line);}
+  .rate-bar label{font-size:13px;color:var(--gray);}
+  .rate-bar input{width:90px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:14px;}
+  .rate-bar select{padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:14px;}
+
+  .toolbar{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap;align-items:center;}
+  .btn{border:none;border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;font-weight:600;}
+  .btn-primary{background:var(--pr);color:#fff;}
+  .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--line);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .status{font-size:13px;color:var(--gray);}
+
+  .summary{display:flex;gap:16px;margin:16px 0;flex-wrap:wrap;}
+  .stat-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 20px;min-width:140px;}
+  .stat-card .num{font-size:22px;font-weight:700;color:var(--pr);}
+  .stat-card .label{font-size:12px;color:var(--gray);margin-top:4px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:10px;overflow:hidden;margin:12px 0;}
+  th{background:var(--pr);color:#fff;font-weight:600;padding:10px 8px;text-align:center;white-space:nowrap;}
+  td{border:1px solid var(--line);padding:8px;text-align:center;}
+  tr:nth-child(even) td{background:#fafafa;}
+  td.num{font-variant-numeric:tabular-nums;}
+  td.left{text-align:left;}
+  .auto-tag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px;background:#e8f6ee;color:var(--green);font-weight:600;}
+  .pda-tag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px;background:#fdeeee;color:var(--pr);font-weight:600;}
+
+  .text-list{background:#fff;border:1px solid var(--line);border-radius:10px;padding:20px;margin:16px 0;
+             font-size:14px;line-height:2;white-space:pre-wrap;font-family:"Microsoft YaHei",sans-serif;}
+  .text-list h3{font-size:15px;margin-bottom:10px;color:var(--ink);}
+
+  .client-block{margin-bottom:12px;padding:10px 14px;background:#fafafa;border-radius:8px;}
+  .client-head{font-weight:700;font-size:14px;margin-bottom:6px;}
+  .client-head .total{color:var(--pr);margin-left:10px;}
+  .policy-row{font-size:13px;color:var(--gray);padding-left:16px;}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/">计划书助手</a>
+  <span class="logo">续保提醒</span>
+  <span class="sub">上传 AES Premium Position Enquiry 的 HTML，按客户合并生成催缴名单</span>
+</header>
+
+<div class="wrap">
+
+  <div class="drop" id="drop">
+    <p>把 AES「Premium Position Enquiry」网页<b>另存为 HTML</b>，然后拖到这里（或点击选择）</p>
+    <p style="margin-top:8px;font-size:12px;color:var(--gray)">每月换新 HTML，自动按 Pay-To-Date 月份生成收尾语</p>
+  </div>
+  <input type="file" id="fileInput" accept=".html,.htm" style="display:none">
+
+  <div class="rate-bar" id="rateBar" style="display:none">
+    <label>汇率(USD→HKD)</label>
+    <input type="number" id="rateHkd" value="7.9" step="0.01">
+    <label>自动转账扣款日</label>
+    <input type="number" id="ddaDay" value="6" style="width:60px">
+    <label>范围</label>
+    <select id="includeMonthly">
+      <option value="0">仅年缴（剔除月缴）</option>
+      <option value="1">含月缴（全部）</option>
+    </select>
+  </div>
+
+  <div class="toolbar" id="toolbar" style="display:none">
+    <button class="btn btn-primary" id="btnParse">重新解析</button>
+    <button class="btn btn-ghost" id="btnCopy">复制名单</button>
+    <button class="btn btn-ghost" id="btnClear">清空</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div id="resultArea"></div>
+
+</div>
+
+<script>
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const rateBar = document.getElementById('rateBar');
+const toolbar = document.getElementById('toolbar');
+const resultArea = document.getElementById('resultArea');
+const statusEl = document.getElementById('status');
+const rateHkd = document.getElementById('rateHkd');
+const ddaDay = document.getElementById('ddaDay');
+const includeMonthly = document.getElementById('includeMonthly');
+
+let currentFile = null;
+
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => {
+  e.preventDefault(); drop.classList.remove('over');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+};
+fileInput.onchange = () => { if (fileInput.files.length) handleFile(fileInput.files[0]); };
+
+function handleFile(file) {
+  currentFile = file;
+  statusEl.textContent = '正在解析：' + file.name;
+  rateBar.style.display = 'flex';
+  toolbar.style.display = 'flex';
+  parse();
+}
+
+async function parse() {
+  if (!currentFile) return;
+  const fd = new FormData();
+  fd.append('file', currentFile);
+  fd.append('rate', rateHkd.value || 7.9);
+  fd.append('dda_day', ddaDay.value || 6);
+  fd.append('include_monthly', includeMonthly.value === '1');
+
+  statusEl.textContent = '正在解析...';
+  try {
+    const resp = await fetch('/api/renewal-parse?' + new URLSearchParams({
+      rate: rateHkd.value || 7.9,
+      dda_day: ddaDay.value || 6,
+      include_monthly: includeMonthly.value === '1' ? 'true' : 'false',
+    }), { method: 'POST', body: fd });
+    if (!resp.ok) {
+      const err = await resp.json();
+      statusEl.textContent = '解析失败：' + (err.detail || '未知错误');
+      return;
+    }
+    const data = await resp.json();
+    render(data);
+    statusEl.textContent = '解析完成';
+  } catch (e) {
+    statusEl.textContent = '解析失败：' + e.message;
+  }
+}
+
+function money(v) { return 'HK$' + Number(v).toLocaleString('en-US', {maximumFractionDigits: 0}); }
+
+function render(data) {
+  let html = '';
+
+  // 统计卡片
+  html += '<div class="summary">';
+  html += `<div class="stat-card"><div class="num">${data.client_count}</div><div class="label">客户数</div></div>`;
+  html += `<div class="stat-card"><div class="num">${data.total_records}</div><div class="label">年缴保单数</div></div>`;
+  if (data.skipped_monthly > 0)
+    html += `<div class="stat-card"><div class="num" style="color:var(--gray)">${data.skipped_monthly}</div><div class="label">已剔除月缴</div></div>`;
+  html += `<div class="stat-card"><div class="num">${money(data.total_hkd)}</div><div class="label">应缴总额(港币)</div></div>`;
+  html += '</div>';
+
+  // 客户汇总表
+  html += '<table><thead><tr>';
+  html += '<th>序号</th><th>姓名</th><th>保单数</th><th>产品</th>';
+  html += '<th>缴费编号</th><th>应缴港币</th><th>自动转账</th>';
+  html += '</tr></thead><tbody>';
+  data.clients.forEach((c, i) => {
+    const plans = c.policies.map(p => p.plan).join('<br>');
+    const ids = c.policies.map(p => p.bill_id).join('<br>');
+    const autoCount = c.policies.filter(p => p.is_auto).length;
+    const autoLabel = autoCount > 0 ? `<span class="auto-tag">${autoCount}张自动转账</span>` : '—';
+    html += `<tr>
+      <td>${i+1}</td>
+      <td style="font-weight:700">${c.name}</td>
+      <td>${c.policy_count}</td>
+      <td class="left" style="font-size:12px">${plans}</td>
+      <td style="font-size:12px">${ids}</td>
+      <td class="num" style="font-weight:700;color:var(--pr)">${money(c.total_hkd)}</td>
+      <td>${autoLabel}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+
+  // 纯文字名单
+  html += '<div class="text-list"><h3>催缴名单（可直接复制发客户）</h3>';
+  html += '<pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.8">' + escapeHtml(data.text_list) + '</pre>';
+  html += '</div>';
+
+  resultArea.innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('btnParse').onclick = parse;
+rateHkd.oninput = parse;
+ddaDay.oninput = parse;
+includeMonthly.onchange = parse;
+
+document.getElementById('btnCopy').onclick = () => {
+  const pre = resultArea.querySelector('.text-list pre');
+  if (!pre) return;
+  navigator.clipboard.writeText(pre.textContent).then(() => {
+    statusEl.textContent = '已复制到剪贴板';
+  });
+};
+
+document.getElementById('btnClear').onclick = () => {
+  currentFile = null;
+  resultArea.innerHTML = '';
+  rateBar.style.display = 'none';
+  toolbar.style.display = 'none';
+  statusEl.textContent = '';
+};
+</script>
+
+</body>
+</html>

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家庭保单规划 · 计划书助手</title>
+<style>
+  :root{
+    --pr:#e60012; --pr-dark:#c00010; --ink:#222; --gray:#888;
+    --line:#eee; --bg:#f5f6f8; --green:#0a7a3d; --blue:#1f5fbf;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--ink);}
+  header{background:#fff;padding:14px 22px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);}
+  header a{text-decoration:none;color:var(--gray);font-size:13px;}
+  header .logo{font-size:18px;font-weight:700;color:var(--pr);}
+  header .sub{font-size:12px;color:var(--gray);}
+  .wrap{max-width:1100px;margin:20px auto;padding:0 16px;}
+
+  .drop{border:2px dashed #cfd3da;border-radius:12px;background:#fff;padding:36px 20px;
+        text-align:center;color:var(--gray);cursor:pointer;transition:.2s;}
+  .drop:hover,.drop.over{border-color:var(--pr);color:var(--pr);background:#fff5f6;}
+  .drop b{color:var(--ink);}
+
+  .rate-bar{display:flex;gap:16px;margin:16px 0;align-items:center;flex-wrap:wrap;
+            background:#fff;padding:12px 16px;border-radius:10px;border:1px solid var(--line);}
+  .rate-bar label{font-size:13px;color:var(--gray);}
+  .rate-bar input{width:90px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:14px;}
+
+  .toolbar{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap;align-items:center;}
+  .btn{border:none;border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;font-weight:600;}
+  .btn-primary{background:var(--pr);color:#fff;}
+  .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--line);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .status{font-size:13px;color:var(--gray);}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:10px;overflow:hidden;}
+  th{background:var(--pr);color:#fff;font-weight:600;padding:10px 8px;text-align:center;white-space:nowrap;}
+  td{border:1px solid var(--line);padding:8px;text-align:center;}
+  tr:nth-child(even) td{background:#fafafa;}
+  td input{width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;text-align:center;}
+  td.num{font-variant-numeric:tabular-nums;}
+  .cat-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;}
+  .cat-危疾{background:#fdeeee;color:var(--pr);}
+  .cat-医疗{background:#eaf1fb;color:var(--blue);}
+  .cat-储蓄{background:#e8f6ee;color:var(--green);}
+  .cat-寿险{background:#f6efdf;color:#8a5b00;}
+  .cat-其他{background:#eef0f3;color:var(--gray);}
+
+  .group-section{margin:20px 0;}
+  .group-title{font-size:16px;font-weight:700;margin:16px 0 10px;padding-left:10px;border-left:4px solid var(--pr);}
+
+  .err{color:var(--pr);font-size:12px;}
+</style>
+</head>
+<body>
+<header>
+  <a href="/">← 返回</a>
+  <div>
+    <div class="logo">家庭保单规划</div>
+    <div class="sub">上传多张计划书 PDF，自动汇总家庭保障方案</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="drop" id="drop">
+    <b>拖拽多个计划书 PDF 到这里</b><br>
+    <span style="font-size:12px">或点击选择文件（支持批量上传）</span>
+    <input type="file" id="fileInput" multiple accept=".pdf" style="display:none">
+  </div>
+
+  <div class="rate-bar" id="rateBar" style="display:none">
+    <label>USD → HKD</label>
+    <input type="number" id="rateHkd" value="7.8" step="0.01">
+    <label>USD → RMB</label>
+    <input type="number" id="rateRmb" value="7.2" step="0.01">
+  </div>
+
+  <div class="toolbar" id="toolbar" style="display:none">
+    <button class="btn btn-primary" id="btnExport">导出 PPT</button>
+    <button class="btn btn-ghost" id="btnExportImg">导出长图</button>
+    <button class="btn btn-ghost" id="btnClear">清空</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div id="resultArea"></div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const rateBar = document.getElementById('rateBar');
+const toolbar = document.getElementById('toolbar');
+const resultArea = document.getElementById('resultArea');
+const statusEl = document.getElementById('status');
+
+let policies = [];
+
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => {
+  e.preventDefault(); drop.classList.remove('over');
+  uploadFiles(e.dataTransfer.files);
+};
+fileInput.onchange = () => uploadFiles(fileInput.files);
+
+async function uploadFiles(files) {
+  if (!files.length) return;
+  statusEl.textContent = `正在解析 ${files.length} 个文件...`;
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+  try {
+    const resp = await fetch('/api/family-parse', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (data.detail) { statusEl.textContent = '错误：' + data.detail; return; }
+    for (const p of data.policies) {
+      if (p.error) {
+        policies.push({ filename: p.filename, product_name: '解析失败', category: '其他', age: null, gender: null, sum_assured: null, annual_premium: null, pay_years: null, total_premium: null, currency: 'USD', error: p.error });
+      } else {
+        policies.push(p);
+      }
+    }
+    rateBar.style.display = 'flex';
+    toolbar.style.display = 'flex';
+    render();
+    statusEl.textContent = `已解析 ${policies.length} 张保单`;
+  } catch (e) {
+    statusEl.textContent = '上传失败：' + e.message;
+  }
+  fileInput.value = '';
+}
+
+function fmt(v) { return v == null ? '—' : '$' + Number(v).toLocaleString('en-US', {maximumFractionDigits: 0}); }
+function fmtHkd(v) { if (v == null) return '—'; const r = parseFloat(rateHkd.value)||7.8; return 'HK$' + Math.round(v*r).toLocaleString(); }
+function fmtRmb(v) { if (v == null) return '—'; const r = parseFloat(rateRmb.value)||7.2; return '¥' + Math.round(v*r).toLocaleString(); }
+
+// 万为单位：475000 → 47.5万
+function fmtWan(v) {
+  if (v == null) return '—';
+  if (v >= 10000) return (v/10000).toFixed(v >= 100000 ? 0 : 1) + '万';
+  return v.toLocaleString();
+}
+// 保额单元格：$47.5万
+function fmtSumCell(v) {
+  if (v == null) return '—';
+  return '$' + fmtWan(v);
+}
+// HKD保额：HKD 373万
+function fmtSumHkdCell(v) {
+  if (v == null) return '—';
+  const hkd = v * (parseFloat(rateHkd.value)||7.8);
+  return 'HKD ' + fmtWan(hkd);
+}
+// 年缴单元格：$17,922.5
+function fmtPremCell(v) {
+  if (v == null) return '—';
+  return '$' + v.toLocaleString('en-US', {maximumFractionDigits: 1});
+}
+// HKD年缴：HK$140,871
+function fmtPremHkdCell(v) {
+  if (v == null) return '—';
+  const hkd = v * (parseFloat(rateHkd.value)||7.8);
+  return 'HK$' + Math.round(hkd).toLocaleString();
+}
+
+function catClass(cat) {
+  if (cat && cat.includes('危疾')) return 'cat-危疾';
+  if (cat && cat.includes('医疗')) return 'cat-医疗';
+  if (cat && cat.includes('储蓄')) return 'cat-储蓄';
+  if (cat && cat.includes('寿险')) return 'cat-寿险';
+  return 'cat-其他';
+}
+
+function render() {
+  if (!policies.length) { resultArea.innerHTML = ''; return; }
+  let html = '';
+
+  // ===== 1. 全部保单可编辑表（修改数据用） =====
+  html += '<div class="group-title">全部保单（可编辑）</div>';
+  html += '<table><thead><tr>';
+  html += '<th>受保人</th><th>产品</th><th>类型</th><th>保额(USD)</th><th>年缴(USD)</th><th>供款期</th><th>HKD年缴</th><th>RMB年缴</th><th>文件名</th>';
+  html += '</tr></thead><tbody>';
+  policies.forEach((p, i) => {
+    html += `<tr>
+      <td><input value="${p.age||''}" placeholder="年龄" style="width:50px" onchange="policies[${i}].age=this.value;render()"><input value="${p.gender||''}" placeholder="性别" style="width:40px" onchange="policies[${i}].gender=this.value;render()"></td>
+      <td><input value="${p.product_name||''}" style="width:130px" onchange="policies[${i}].product_name=this.value;render()"></td>
+      <td><span class="cat-tag ${catClass(p.category)}">${p.category||'其他'}</span></td>
+      <td class="num"><input value="${p.sum_assured||''}" style="width:90px" onchange="policies[${i}].sum_assured=parseFloat(this.value);render()"></td>
+      <td class="num"><input value="${p.annual_premium||''}" style="width:90px" onchange="policies[${i}].annual_premium=parseFloat(this.value);render()"></td>
+      <td><input value="${p.pay_years||''}" style="width:50px" onchange="policies[${i}].pay_years=parseInt(this.value);render()"></td>
+      <td class="num">${fmtHkd(p.annual_premium)}</td>
+      <td class="num">${fmtRmb(p.annual_premium)}</td>
+      <td style="font-size:11px;color:#aaa;max-width:120px;overflow:hidden;text-overflow:ellipsis">${p.filename||''}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+
+  // ===== 2. 按产品类型分组对比表（行=家庭成员×产品，列=保额/年缴/供款期） =====
+  // 收集所有家庭成员（按年龄排序）
+  const personSet = new Set();
+  policies.forEach(p => {
+    const key = `${p.age||'?'}岁${p.gender||'?'}`;
+    personSet.add(key);
+  });
+  const persons = Array.from(personSet).sort((a,b) => {
+    const na = parseInt(a)||0, nb = parseInt(b)||0;
+    return na - nb;
+  });
+
+  // 按类型分组
+  const cats = {};
+  policies.forEach(p => {
+    const cat = p.category||'其他';
+    if (!cats[cat]) cats[cat] = [];
+    cats[cat].push(p);
+  });
+
+  html += '<div class="group-section"><div class="group-title">按产品类型对比</div>';
+
+  for (const [cat, pols] of Object.entries(cats)) {
+    html += `<div style="background:#fff;border-radius:10px;padding:16px;margin-bottom:16px;border:1px solid var(--line)">`;
+    html += `<div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--pr)">${cat}</div>`;
+
+    // 表格：家庭成员 | 产品 | 总保额(USD) | 总保额(HKD) | 年保费(USD) | 年保费(HKD) | 供款期 | 最后剩余价值
+    html += '<table style="font-size:12px"><thead><tr>';
+    html += '<th style="text-align:left;width:110px">家庭成员</th>';
+    html += '<th style="text-align:left">产品</th>';
+    html += '<th>总保额(USD)</th>';
+    html += '<th>总保额(HKD)</th>';
+    html += '<th>年保费(USD)</th>';
+    html += '<th>年保费(HKD)</th>';
+    html += '<th style="width:60px">供款期</th>';
+    html += '<th>最后剩余价值(USD)</th>';
+    html += '</tr></thead><tbody>';
+
+    // 按人分组输出
+    persons.forEach(person => {
+      const personPols = pols.filter(p => {
+        const pk = `${p.age||'?'}岁${p.gender||'?'}`;
+        return pk === person;
+      });
+      if (!personPols.length) return;
+
+      personPols.forEach((pol, idx) => {
+        html += '<tr>';
+        if (idx === 0) {
+          html += `<td rowspan="${personPols.length}" style="font-weight:700;text-align:left;background:#f8f9fa;vertical-align:middle">${person}</td>`;
+        }
+        html += `<td style="text-align:left">${pol.product_name||'—'}</td>`;
+        html += `<td style="white-space:nowrap">${fmtSumCell(pol.sum_assured)}</td>`;
+        html += `<td style="white-space:nowrap">${fmtSumHkdCell(pol.sum_assured)}</td>`;
+        html += `<td style="white-space:nowrap">${fmtPremCell(pol.annual_premium)}</td>`;
+        html += `<td style="white-space:nowrap">${fmtPremHkdCell(pol.annual_premium)}</td>`;
+        html += `<td>${pol.pay_years ? pol.pay_years + '年' : '—'}</td>`;
+        // 最后剩余价值（储蓄险）
+        const lastSv = pol.last_surrender_value;
+        html += `<td style="white-space:nowrap">${lastSv ? '$' + Number(lastSv).toLocaleString('en-US', {maximumFractionDigits: 0}) : '—'}</td>`;
+        html += '</tr>';
+      });
+    });
+
+    html += '</tbody></table>';
+    html += `</div>`;
+  }
+
+  html += '</div>';
+
+  // ===== 3. 按人汇总（每个人的所有保单） =====
+  html += '<div class="group-section"><div class="group-title">按人汇总</div>';
+  const personPolicies = {};
+  policies.forEach(p => {
+    const key = `${p.age||'?'}岁${p.gender||'?'}`;
+    if (!personPolicies[key]) personPolicies[key] = [];
+    personPolicies[key].push(p);
+  });
+  for (const [person, pols] of Object.entries(personPolicies)) {
+    const totalAnnual = pols.reduce((s,p) => s + (p.annual_premium||0), 0);
+    const totalHkd = pols.reduce((s,p) => s + (p.annual_premium||0) * (parseFloat(rateHkd.value)||7.8), 0);
+    html += `<div style="background:#fff;padding:12px 16px;border-radius:10px;margin-bottom:10px;border:1px solid var(--line)">`;
+    html += `<b>${person}</b> ｜ 共 ${pols.length} 张 ｜ 年缴 <b>${fmt(totalAnnual)}</b> (HK$${Math.round(totalHkd).toLocaleString()})`;
+    html += `<div style="font-size:12px;color:var(--gray);margin-top:6px">${pols.map(p=>`[${p.category}] ${p.product_name} ${fmt(p.annual_premium)}`).join(' ｜ ')}</div>`;
+    html += `</div>`;
+  }
+  html += '</div>';
+
+  resultArea.innerHTML = html;
+}
+
+document.getElementById('rateHkd').oninput = render;
+document.getElementById('rateRmb').oninput = render;
+
+document.getElementById('btnExport').onclick = async () => {
+  statusEl.textContent = '正在生成 PPT...';
+  try {
+    const resp = await fetch('/api/family-export-ppt', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        policies: policies,
+        usd_hkd: parseFloat(rateHkd.value)||7.8,
+        usd_rmb: parseFloat(rateRmb.value)||7.2,
+      })
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      statusEl.textContent = '导出失败：' + (err.detail||'未知错误');
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'family_plan.pptx'; a.click();
+    URL.revokeObjectURL(url);
+    statusEl.textContent = 'PPT 已下载';
+  } catch (e) {
+    statusEl.textContent = '导出失败：' + e.message;
+  }
+};
+
+document.getElementById('btnExportImg').onclick = async () => {
+  statusEl.textContent = '正在生成长图...';
+  try {
+    const el = document.getElementById('resultArea');
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      backgroundColor: '#f5f6f8',
+      useCORS: true,
+    });
+    const link = document.createElement('a');
+    link.download = 'family_plan.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    statusEl.textContent = '长图已下载';
+  } catch (e) {
+    statusEl.textContent = '导出失败：' + e.message;
+  }
+};
+
+document.getElementById('btnClear').onclick = () => {
+  policies = [];
+  render();
+  rateBar.style.display = 'none';
+  toolbar.style.display = 'none';
+  statusEl.textContent = '';
+};
+</script>
+</body>
+</html>
