@@ -257,7 +257,7 @@ function render() {
     html += `<div style="background:#fff;border-radius:10px;padding:16px;margin-bottom:16px;border:1px solid var(--line)">`;
     html += `<div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--pr)">${cat}</div>`;
 
-    // 表格：家庭成员 | 产品 | 总保额(USD) | 总保额(HKD) | 年保费(USD) | 年保费(HKD) | 供款期 | 最后剩余价值
+    // 表格：家庭成员 | 产品 | 总保额(USD) | 总保额(HKD) | 年保费(USD) | 年保费(HKD) | 供款期 | 最后剩余价值 | 现金赏(USD)
     html += '<table style="font-size:12px"><thead><tr>';
     html += '<th style="text-align:left;width:110px">家庭成员</th>';
     html += '<th style="text-align:left">产品</th>';
@@ -267,6 +267,7 @@ function render() {
     html += '<th>年保费(HKD)</th>';
     html += '<th style="width:60px">供款期</th>';
     html += '<th>最后剩余价值(USD)</th>';
+    if (showCashReward) html += '<th>现金赏(USD)</th>';
     html += '</tr></thead><tbody>';
 
     // 按人分组输出
@@ -291,6 +292,11 @@ function render() {
         // 最后剩余价值（储蓄险）
         const lastSv = pol.last_surrender_value;
         html += `<td style="white-space:nowrap">${lastSv ? '$' + Number(lastSv).toLocaleString('en-US', {maximumFractionDigits: 0}) : '—'}</td>`;
+        // 现金赏（勾选时）
+        if (showCashReward) {
+          const cr = calcCashReward(pol);
+          html += `<td style="white-space:nowrap;color:#E67E22;font-weight:600">${cr ? '$' + cr.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—'}</td>`;
+        }
         html += '</tr>';
       });
     });
@@ -312,12 +318,16 @@ function render() {
   });
   html += '<table style="margin-top:8px"><thead><tr>';
   html += '<th>家庭成员</th><th>产品</th><th>总保额(USD)</th><th>总保额(HKD)</th><th>年保费(USD)</th><th>年保费(HKD)</th><th>供款期</th>';
+  if (showCashReward) html += '<th>现金赏(USD)</th>';
   html += '</tr></thead><tbody>';
   let grandTotalUsd = 0;
+  let grandCashReward = 0;
   personOrder.forEach(person => {
     const pols = personPolicies[person];
     pols.forEach((p, idx) => {
       grandTotalUsd += p.annual_premium || 0;
+      const cr = calcCashReward(p);
+      if (cr) grandCashReward += cr;
       const sa = p.sum_assured ? (p.sum_assured >= 10000 ? `$${(p.sum_assured/10000).toFixed(p.sum_assured>=1000000?0:1)}万` : `$${p.sum_assured.toLocaleString()}`) : '—';
       const saHkd = p.sum_assured ? `HKD ${(p.sum_assured*(parseFloat(rateHkd.value)||7.8)/10000).toFixed(p.sum_assured*(parseFloat(rateHkd.value)||7.8)>=1000000?0:1)}万` : '—';
       html += `<tr>
@@ -328,6 +338,7 @@ function render() {
         <td class="num">${fmt(p.annual_premium)}</td>
         <td class="num">HK$${Math.round((p.annual_premium||0)*(parseFloat(rateHkd.value)||7.8)).toLocaleString()}</td>
         <td class="num">${p.pay_years ? p.pay_years+'年' : '—'}</td>
+        ${showCashReward ? `<td class="num" style="color:#E67E22;font-weight:600">${cr ? '$' + cr.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—'}</td>` : ''}
       </tr>`;
     });
   });
@@ -337,6 +348,7 @@ function render() {
     <td class="num">${fmt(grandTotalUsd)}</td>
     <td class="num">HK$${Math.round(grandHkd).toLocaleString()}</td>
     <td></td>
+    ${showCashReward ? `<td class="num" style="color:#E67E22">$${grandCashReward.toLocaleString('en-US', {maximumFractionDigits: 0})}</td>` : ''}
   </tr>`;
   html += '</tbody></table>';
   html += '</div>';
@@ -345,6 +357,7 @@ function render() {
 }
 
 document.getElementById('rateHkd').oninput = render;
+document.getElementById('chkCashReward').onchange = render;
 document.getElementById('rateRmb').oninput = render;
 
 document.getElementById('btnExport').onclick = async () => {
