@@ -18,6 +18,7 @@ PRODUCT_NAMES = {
     "CIM3": "诚保一生危疾保险计划",
     "CIE3": "守护健康危疾加护保 III",
     "ENCASH": "保诚加护一生住院现金储蓄保险",
+    "PHOR": "诚誉财富保险计划",
 }
 
 NUM = re.compile(r"^\d{1,3}(,\d{3})+(\.\d+)?$")  # 25,000 / 1,240,550
@@ -48,6 +49,8 @@ def detect_product(text):
         return "CIM3"
     if "ENCASH" in text or "加護一生住院現金" in text or "住院現金儲蓄保險" in text:
         return "ENCASH"
+    if "PHOR" in text or "誠譽財富" in text or "诚誉财富" in text:
+        return "PHOR"
     return "UNKNOWN"
 
 
@@ -764,11 +767,13 @@ FAMILY_PRODUCT_NAMES = {
     "VIP": "VIP 自愿医保尚宾",
     "LFRE2": "LFRE2 自主未来II",
     "PLP2": "PLP2 美好人寿II",
+    "PHOR": "PHOR 诚誉财富保险计划",
 }
 
 FAMILY_PRODUCT_CATEGORY = {
     "PRMESP": "储蓄/退休",
     "TRST": "储蓄/退休",
+    "PHOR": "储蓄/退休",
     "CIM3": "危疾",
     "CIE3": "危疾",
     "CIP2": "危疾",
@@ -808,6 +813,7 @@ def detect_product_family(text):
     if "尚賓" in text or "尚宾" in text: return "MCVIP"  # 关键词兜底
     if "自主未來" in text or "自主未来" in text: return "LFRE2"
     if "美好人壽" in text or "美好人寿" in text: return "PLP2"
+    if "誠譽財富" in text or "诚誉财富" in text: return "PHOR"
     return "UNKNOWN"
 
 
