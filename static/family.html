@@ -82,6 +82,10 @@
     <button class="btn btn-primary" id="btnExport">导出 PPT</button>
     <button class="btn btn-ghost" id="btnExportImg">导出长图</button>
     <button class="btn btn-ghost" id="btnClear">清空</button>
+    <label style="font-size:12px;color:var(--gray);margin-left:8px;cursor:pointer">
+      <input type="checkbox" id="chkCashReward" style="vertical-align:middle">
+      世誉财富限时现金赏（2026.10-12）
+    </label>
     <span class="status" id="status"></span>
   </div>
 
@@ -180,27 +184,54 @@ function render() {
   if (!policies.length) { resultArea.innerHTML = ''; return; }
   let html = '';
 
-  // ===== 1. 全部保单可编辑表（修改数据用） =====
-  html += '<div class="group-title">全部保单（可编辑）</div>';
-  html += '<table><thead><tr>';
-  html += '<th>受保人</th><th>产品</th><th>类型</th><th>保额(USD)</th><th>年缴(USD)</th><th>供款期</th><th>HKD年缴</th><th>RMB年缴</th><th>文件名</th>';
-  html += '</tr></thead><tbody>';
-  policies.forEach((p, i) => {
-    html += `<tr>
-      <td><input value="${p.age||''}" placeholder="年龄" style="width:50px" onchange="policies[${i}].age=this.value;render()"><input value="${p.gender||''}" placeholder="性别" style="width:40px" onchange="policies[${i}].gender=this.value;render()"></td>
-      <td><input value="${p.product_name||''}" style="width:130px" onchange="policies[${i}].product_name=this.value;render()"></td>
-      <td><span class="cat-tag ${catClass(p.category)}">${p.category||'其他'}</span></td>
-      <td class="num"><input value="${p.sum_assured||''}" style="width:90px" onchange="policies[${i}].sum_assured=parseFloat(this.value);render()"></td>
-      <td class="num"><input value="${p.annual_premium||''}" style="width:90px" onchange="policies[${i}].annual_premium=parseFloat(this.value);render()"></td>
-      <td><input value="${p.pay_years||''}" style="width:50px" onchange="policies[${i}].pay_years=parseInt(this.value);render()"></td>
-      <td class="num">${fmtHkd(p.annual_premium)}</td>
-      <td class="num">${fmtRmb(p.annual_premium)}</td>
-      <td style="font-size:11px;color:#aaa;max-width:120px;overflow:hidden;text-overflow:ellipsis">${p.filename||''}</td>
-    </tr>`;
-  });
-  html += '</tbody></table>';
+  // ===== 1. 全部保单可编辑表（折叠，修改/删除数据用） =====
+  const editOpen = window._editOpen || false;
+  html += `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="window._editOpen=!window._editOpen;render()">`;
+  html += `<div style="font-size:14px;font-weight:700">全部保单（可编辑）<span style="color:var(--gray);font-weight:400;margin-left:8px">${policies.length}张</span></div>`;
+  html += `<div style="color:var(--pr);font-size:13px;font-weight:600">${editOpen ? '收起 ▲' : '展开编辑/删除 ▼'}</div>`;
+  html += '</div>';
 
-  // ===== 2. 按产品类型分组对比表（行=家庭成员×产品，列=保额/年缴/供款期） =====
+  if (editOpen) {
+    html += '<table style="margin-top:-1px;border-radius:0 0 10px 10px"><thead><tr>';
+    html += '<th>受保人</th><th>产品</th><th>类型</th><th>保额(USD)</th><th>年缴(USD)</th><th>供款期</th><th>HKD年缴</th><th>RMB年缴</th><th>文件名</th><th>操作</th>';
+    html += '</tr></thead><tbody>';
+    policies.forEach((p, i) => {
+      html += `<tr>
+        <td><input value="${p.age||''}" placeholder="年龄" style="width:50px" onchange="policies[${i}].age=this.value;render()"><input value="${p.gender||''}" placeholder="性别" style="width:40px" onchange="policies[${i}].gender=this.value;render()"></td>
+        <td><input value="${p.product_name||''}" style="width:130px" onchange="policies[${i}].product_name=this.value;render()"></td>
+        <td><span class="cat-tag ${catClass(p.category)}">${p.category||'其他'}</span></td>
+        <td class="num"><input value="${p.sum_assured||''}" style="width:90px" onchange="policies[${i}].sum_assured=parseFloat(this.value);render()"></td>
+        <td class="num"><input value="${p.annual_premium||''}" style="width:90px" onchange="policies[${i}].annual_premium=parseFloat(this.value);render()"></td>
+        <td><input value="${p.pay_years||''}" style="width:50px" onchange="policies[${i}].pay_years=parseInt(this.value);render()"></td>
+        <td class="num">${fmtHkd(p.annual_premium)}</td>
+        <td class="num">${fmtRmb(p.annual_premium)}</td>
+        <td style="font-size:11px;color:#aaa;max-width:120px;overflow:hidden;text-overflow:ellipsis">${p.filename||''}</td>
+        <td><button onclick="event.stopPropagation();policies.splice(${i},1);render()" style="border:none;background:#fdeeee;color:var(--pr);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">删除</button></td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    html += '<div style="padding:10px 0;text-align:center">';
+    html += '<button onclick="policies.push({age:null,gender:null,product_name:\'\',category:\'其他\',sum_assured:null,annual_premium:null,pay_years:null,currency:\'USD\',filename:\'手动添加\'});render()" style="border:1px dashed var(--line);background:#fff;color:var(--pr);padding:8px 24px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">+ 新增保单</button>';
+    html += '</div>';
+  }
+
+  // ===== 2. 按产品类型分组对比表 =====
+  // 世誉现金赏计算（勾选时生效，仅PRMESP）
+  const showCashReward = document.getElementById('chkCashReward').checked;
+  function calcCashReward(pol) {
+    if (!showCashReward) return null;
+    if (pol.product_code !== 'PRMESP') return null;
+    const prem = pol.annual_premium || 0;
+    let pct = 0;
+    if (prem >= 3000000) pct = 2;
+    else if (prem >= 1000000) pct = 1.75;
+    else if (prem >= 500000) pct = 1.5;
+    else if (prem >= 100000) pct = 1.25;
+    else if (prem >= 25000) pct = 0.5;
+    if (pct === 0) return null;
+    return prem * pct / 100;
+  }
+
   // 收集所有家庭成员（按年龄排序）
   const personSet = new Set();
   policies.forEach(p => {
@@ -270,22 +301,44 @@ function render() {
 
   html += '</div>';
 
-  // ===== 3. 按人汇总（每个人的所有保单） =====
+  // ===== 3. 按人汇总（每个产品一行，按人分组，带合计） =====
   html += '<div class="group-section"><div class="group-title">按人汇总</div>';
   const personPolicies = {};
+  const personOrder = [];
   policies.forEach(p => {
     const key = `${p.age||'?'}岁${p.gender||'?'}`;
-    if (!personPolicies[key]) personPolicies[key] = [];
+    if (!personPolicies[key]) { personPolicies[key] = []; personOrder.push(key); }
     personPolicies[key].push(p);
   });
-  for (const [person, pols] of Object.entries(personPolicies)) {
-    const totalAnnual = pols.reduce((s,p) => s + (p.annual_premium||0), 0);
-    const totalHkd = pols.reduce((s,p) => s + (p.annual_premium||0) * (parseFloat(rateHkd.value)||7.8), 0);
-    html += `<div style="background:#fff;padding:12px 16px;border-radius:10px;margin-bottom:10px;border:1px solid var(--line)">`;
-    html += `<b>${person}</b> ｜ 共 ${pols.length} 张 ｜ 年缴 <b>${fmt(totalAnnual)}</b> (HK$${Math.round(totalHkd).toLocaleString()})`;
-    html += `<div style="font-size:12px;color:var(--gray);margin-top:6px">${pols.map(p=>`[${p.category}] ${p.product_name} ${fmt(p.annual_premium)}`).join(' ｜ ')}</div>`;
-    html += `</div>`;
-  }
+  html += '<table style="margin-top:8px"><thead><tr>';
+  html += '<th>家庭成员</th><th>产品</th><th>总保额(USD)</th><th>总保额(HKD)</th><th>年保费(USD)</th><th>年保费(HKD)</th><th>供款期</th>';
+  html += '</tr></thead><tbody>';
+  let grandTotalUsd = 0;
+  personOrder.forEach(person => {
+    const pols = personPolicies[person];
+    pols.forEach((p, idx) => {
+      grandTotalUsd += p.annual_premium || 0;
+      const sa = p.sum_assured ? (p.sum_assured >= 10000 ? `$${(p.sum_assured/10000).toFixed(p.sum_assured>=1000000?0:1)}万` : `$${p.sum_assured.toLocaleString()}`) : '—';
+      const saHkd = p.sum_assured ? `HKD ${(p.sum_assured*(parseFloat(rateHkd.value)||7.8)/10000).toFixed(p.sum_assured*(parseFloat(rateHkd.value)||7.8)>=1000000?0:1)}万` : '—';
+      html += `<tr>
+        <td style="font-weight:700">${idx===0 ? person : ''}</td>
+        <td class="left">${p.product_name}</td>
+        <td class="num">${sa}</td>
+        <td class="num">${saHkd}</td>
+        <td class="num">${fmt(p.annual_premium)}</td>
+        <td class="num">HK$${Math.round((p.annual_premium||0)*(parseFloat(rateHkd.value)||7.8)).toLocaleString()}</td>
+        <td class="num">${p.pay_years ? p.pay_years+'年' : '—'}</td>
+      </tr>`;
+    });
+  });
+  const grandHkd = grandTotalUsd * (parseFloat(rateHkd.value)||7.8);
+  html += `<tr style="background:#FDECEC;font-weight:700;color:var(--pr)">
+    <td>年缴合计</td><td></td><td></td><td></td>
+    <td class="num">${fmt(grandTotalUsd)}</td>
+    <td class="num">HK$${Math.round(grandHkd).toLocaleString()}</td>
+    <td></td>
+  </tr>`;
+  html += '</tbody></table>';
   html += '</div>';
 
   resultArea.innerHTML = html;

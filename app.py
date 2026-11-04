@@ -276,7 +276,6 @@ async def family_export_ppt(payload: dict = None):
             for person in persons:
                 cnt = sum(1 for p in pols if f"{p.get('age','?')}岁{p.get('gender','?')}" == person)
                 total_rows += cnt
-            total_rows += 1  # 合计行
 
             ncols = 7
             slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -295,6 +294,11 @@ async def family_export_ppt(payload: dict = None):
             height = Inches(0.5 * total_rows)
             table_shape = slide.shapes.add_table(total_rows, ncols, left, top, width, height)
             table = table_shape.table
+            # 彻底删除表格默认样式（隔行变色、首列高亮）
+            tbl_pr = table._tbl.tblPr
+            for child in list(tbl_pr):
+                if 'tableStyleId' in child.tag or 'firstRow' in child.tag or 'bandRow' in child.tag:
+                    tbl_pr.remove(child)
 
             # 列宽
             table.columns[0].width = Inches(1.3)
@@ -341,6 +345,8 @@ async def family_export_ppt(payload: dict = None):
 
                     for ci in range(7):
                         cell = table.cell(ri, ci)
+                        cell.fill.solid()
+                        cell.fill.fore_color.rgb = WHITE
                         for para in cell.text_frame.paragraphs:
                             para.font.size = Pt(9)
                             para.font.color.rgb = DARK
@@ -354,27 +360,115 @@ async def family_export_ppt(payload: dict = None):
                             para.font.bold = True
                             para.font.color.rgb = DARK
                             para.alignment = PP_ALIGN.CENTER
-                        table.cell(ri, 0).fill.solid()
-                        table.cell(ri, 0).fill.fore_color.rgb = LIGHT_BG
                     ri += 1
 
-            # 合计行
-            total_prem = sum(p.get("annual_premium") or 0 for p in pols)
-            table.cell(ri, 0).text = "年缴合计"
-            table.cell(ri, 1).text = ""
-            table.cell(ri, 2).text = ""
-            table.cell(ri, 3).text = ""
-            table.cell(ri, 4).text = fmt_prem_usd(total_prem)
-            table.cell(ri, 5).text = fmt_prem_hkd(total_prem)
-            table.cell(ri, 6).text = ""
-            for ci in range(7):
-                cell = table.cell(ri, ci)
-                cell.fill.solid()
-                cell.fill.fore_color.rgb = RGBColor(0xFD, 0xEC, 0xEC)
-                for para in cell.text_frame.paragraphs:
-                    para.font.size = Pt(11)
-                    para.font.bold = True
-                    para.font.color.rgb = RED
+            # 强制所有数据行白底（覆盖表格默认样式）
+            for r in range(1, ri):
+                for c in range(ncols):
+                    cell = table.cell(r, c)
+                    cell.fill.solid()
+                    cell.fill.fore_color.rgb = WHITE
+
+        # ===== 按人汇总页（每个产品一行，带合计行） =====
+        person_policies = {}
+        person_order = []
+        for pol in policies:
+            key = f"{pol.get('age','?')}岁{pol.get('gender','?')}"
+            if key not in person_policies:
+                person_policies[key] = []
+                person_order.append(key)
+            person_policies[key].append(pol)
+
+        # 计算总行数：表头 + 所有产品行 + 合计行
+        total_person_rows = 1 + len(policies) + 1
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        txBox = slide.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(12), Inches(0.6))
+        p = txBox.text_frame.paragraphs[0]
+        p.text = "按人汇总"
+        p.font.size = Pt(24)
+        p.font.bold = True
+        p.font.color.rgb = RED
+
+        headers_person = ["家庭成员", "产品", "总保额(USD)", "总保额(HKD)", "年保费(USD)", "年保费(HKD)", "供款期"]
+        left = Inches(0.3)
+        top = Inches(1.1)
+        width = Inches(12.7)
+        height = Inches(0.5 * total_person_rows)
+        table_shape = slide.shapes.add_table(total_person_rows, 7, left, top, width, height)
+        table = table_shape.table
+        tbl_pr = table._tbl.tblPr
+        for child in list(tbl_pr):
+            if 'tableStyleId' in child.tag or 'firstRow' in child.tag or 'bandRow' in child.tag:
+                tbl_pr.remove(child)
+        table.columns[0].width = Inches(1.3)
+        table.columns[1].width = Inches(2.5)
+        table.columns[2].width = Inches(1.6)
+        table.columns[3].width = Inches(1.6)
+        table.columns[4].width = Inches(1.7)
+        table.columns[5].width = Inches(1.8)
+        table.columns[6].width = Inches(1.0)
+
+        # 表头
+        for ci, h in enumerate(headers_person):
+            cell = table.cell(0, ci)
+            cell.text = h
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RED
+            for para in cell.text_frame.paragraphs:
+                para.font.size = Pt(10)
+                para.font.bold = True
+                para.font.color.rgb = WHITE
+                para.alignment = PP_ALIGN.CENTER
+
+        # 数据行：每个产品一行
+        ri = 1
+        grand_total_usd = 0
+        for person in person_order:
+            pols = person_policies[person]
+            for idx, pol in enumerate(pols):
+                if idx == 0:
+                    table.cell(ri, 0).text = person
+                table.cell(ri, 1).text = pol.get("product_name", "—")
+                table.cell(ri, 2).text = fmt_sum_usd(pol.get("sum_assured"))
+                table.cell(ri, 3).text = fmt_sum_hkd(pol.get("sum_assured"))
+                table.cell(ri, 4).text = fmt_prem_usd(pol.get("annual_premium"))
+                table.cell(ri, 5).text = fmt_prem_hkd(pol.get("annual_premium"))
+                py = pol.get("pay_years")
+                table.cell(ri, 6).text = f"{py}年" if py else "—"
+                grand_total_usd += pol.get("annual_premium") or 0
+
+                for ci in range(7):
+                    cell = table.cell(ri, ci)
+                    cell.fill.solid()
+                    cell.fill.fore_color.rgb = WHITE
+                    for para in cell.text_frame.paragraphs:
+                        para.font.size = Pt(9)
+                        para.font.color.rgb = DARK
+                        para.alignment = PP_ALIGN.CENTER if ci != 1 else PP_ALIGN.LEFT
+                    if idx == 0 and ci == 0:
+                        for para in cell.text_frame.paragraphs:
+                            para.font.size = Pt(10)
+                            para.font.bold = True
+                ri += 1
+
+        # 合计行（只汇总年保费）
+        grand_total_hkd = grand_total_usd * usd_hkd
+        table.cell(ri, 0).text = "年缴合计"
+        table.cell(ri, 1).text = ""
+        table.cell(ri, 2).text = ""
+        table.cell(ri, 3).text = ""
+        table.cell(ri, 4).text = fmt_prem_usd(grand_total_usd)
+        table.cell(ri, 5).text = f"HK${grand_total_hkd:,.0f}"
+        table.cell(ri, 6).text = ""
+        for ci in range(7):
+            cell = table.cell(ri, ci)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor(0xFD, 0xEC, 0xEC)
+            for para in cell.text_frame.paragraphs:
+                para.font.size = Pt(11)
+                para.font.bold = True
+                para.font.color.rgb = RED
+                para.alignment = PP_ALIGN.CENTER
 
         buf = io.BytesIO()
         prs.save(buf)

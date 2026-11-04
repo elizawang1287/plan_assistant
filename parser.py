@@ -749,19 +749,21 @@ def parse_pdf(pdf_path):
 # ============ 家庭保单规划：快速基本信息解析 ============
 
 FAMILY_PRODUCT_NAMES = {
-    "PRMESP": "世誉财富保险计划",
-    "TRST": "信守明天多元货币",
-    "CIM3": "诚保一生危疾",
-    "CIE3": "守护健康危疾加护保III",
-    "ENCASH": "加护一生住院现金",
-    "PLT20": "守护家人定期寿险",
-    "PLT": "定期寿险",
-    "CIT2": "守护健康危疾定期保II",
-    "CIT": "定期危疾",
-    "CPER": "特选危疾治疗保",
+    "PRMESP": "PRMESP 世誉财富保险计划",
+    "TRST": "TRST 信守明天多元货币",
+    "CIM3": "CIM3 诚保一生危疾",
+    "CIE3": "CIE3 守护健康危疾加护保III",
+    "CIP2": "CIP2 危疾首护保险计划II",
+    "ENCASH": "ENCASH 加护一生住院现金",
+    "PLT20": "PLT20 守护家人定期寿险",
+    "PLT": "PLT 定期寿险",
+    "CIT2": "CIT2 守护健康危疾定期保II",
+    "CIT": "CIT 定期危疾",
+    "CPER": "CPER 特选危疾治疗保",
     "MCVIP": "MCVIP",
-    "LFRE2": "自主未来II",
-    "PLP2": "美好人寿II",
+    "VIP": "VIP 自愿医保尚宾",
+    "LFRE2": "LFRE2 自主未来II",
+    "PLP2": "PLP2 美好人寿II",
 }
 
 FAMILY_PRODUCT_CATEGORY = {
@@ -769,15 +771,17 @@ FAMILY_PRODUCT_CATEGORY = {
     "TRST": "储蓄/退休",
     "CIM3": "危疾",
     "CIE3": "危疾",
+    "CIP2": "危疾",
     "CIT2": "定期危疾",
     "CIT": "定期危疾",
     "ENCASH": "住院现金",
     "PLT20": "定期寿险",
     "PLT": "定期寿险",
     "CPER": "医疗",
-    "MCVIP": "高端医疗",
+    "MCVIP": "医疗",
+    "VIP": "医疗",
     "LFRE2": "储蓄/寿险",
-    "PLP2": "寿险",
+    "PLP2": "储蓄/寿险",
 }
 
 
@@ -793,9 +797,15 @@ def detect_product_family(text):
     if "守護健康" in text or "守护健康" in text:
         if "加護保" in text or "加护保" in text: return "CIE3"
         return "CIT2"
+    if "危疾首護" in text or "危疾首护" in text: return "CIP2"
     if "住院現金" in text or "住院现金" in text: return "ENCASH"
     if "守護家人" in text or "守护家人" in text: return "PLT20"
-    if "尚賓" in text or "尚宾" in text: return "MCVIP"
+    # 先按括号里的产品代码区分 VIP / MCVIP
+    if "(MCVIP)" in text or "高端醫療自由行" in text or "高端医疗自由行" in text:
+        return "MCVIP"
+    if "(VIP)" in text or "自願醫保尚賓" in text or "自愿医保尚宾" in text:
+        return "VIP"
+    if "尚賓" in text or "尚宾" in text: return "MCVIP"  # 关键词兜底
     if "自主未來" in text or "自主未来" in text: return "LFRE2"
     if "美好人壽" in text or "美好人寿" in text: return "PLP2"
     return "UNKNOWN"
@@ -829,7 +839,9 @@ def parse_basic_fast(pdf_path):
         "age": None, "gender": None, "currency": None,
         "sum_assured": None, "annual_premium": None,
         "pay_years": None, "total_premium": None,
-        "last_surrender_value": None,  # 最后剩余价值（储蓄险用）
+        "last_surrender_value": None,
+        "rider_name": None,
+        "rider_premium": None,
     }
 
     # 年龄（繁简都支持）
@@ -931,6 +943,14 @@ def parse_basic_fast(pdf_path):
                 info["last_surrender_value"] = last_row.get("guaranteed_cv") or last_row.get("total_cv")
         except Exception:
             pass
+
+    # 检测附加保障 VFPR（灵活自主医保）——放在最后，避免被保额解析覆盖
+    if "VFPR" in text or "靈活自主醫保" in text or "灵活自主医保" in text:
+        info["rider_name"] = "VFPR灵活自主医保"
+        m = re.search(r"\(VFPR\)[^\d]*?([\d,]+\.?\d*)", text, re.S)
+        if m:
+            info["rider_premium"] = _to_num(m.group(1))
+        info["product_name"] += "（含VFPR）"
 
     return info
 
