@@ -74,8 +74,10 @@ async def export_ppt(payload: dict = None):
             fname = f"{age}岁{gender}-年缴{prem_wan}万-{years}年.pptx"
         else:
             sa = b.get("sum_assured", 0) or 0
+            years = b.get("pay_years", "") or ""
             sa_wan = round(sa / 10000, 1) if sa else 0
-            fname = f"{age}岁{gender}-保额{sa_wan}万.pptx"
+            years_str = f"-{years}年" if years else ""
+            fname = f"{age}岁{gender}-保额{sa_wan}万{years_str}.pptx"
         # 文件名编码（中文）
         from urllib.parse import quote
         fname_enc = quote(fname)
@@ -112,8 +114,10 @@ async def export_combined(payload: dict = None):
             fname = f"{age}岁{gender}-年缴{prem_wan}万-{years}年-多提取方案.pptx"
         else:
             sa = b.get("sum_assured", 0) or 0
+            years = b.get("pay_years", "") or ""
             sa_wan = round(sa / 10000, 1) if sa else 0
-            fname = f"{age}岁{gender}-保额{sa_wan}万-多提取方案.pptx"
+            years_str = f"-{years}年" if years else ""
+            fname = f"{age}岁{gender}-保额{sa_wan}万{years_str}-多提取方案.pptx"
         from urllib.parse import quote
         fname_enc = quote(fname)
         return StreamingResponse(
