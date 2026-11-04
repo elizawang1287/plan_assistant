@@ -78,9 +78,15 @@ def parse_basic(text):
         info["total_premium"] = _to_num(m.group(1))
     else:
         m2 = re.search(r"投保時每年總保費\s*([\d,]+\.?\d*)", text)
-        m3 = re.search(r"保費供款年期\s*(\d+)\s*年", text)
         annual = _to_num(m2.group(1)) if m2 else None
-        years = int(m3.group(1)) if m3 else None
+        # 供款年期：PDF表格布局下表头和值不在同一行，从"保費供款年期"往后找
+        years = None
+        m3 = re.search(r"保費供款年期", text)
+        if m3:
+            tail = text[m3.end():m3.end()+500]
+            m4 = re.search(r"(\d+)\s*年", tail)
+            if m4 and int(m4.group(1)) <= 50:
+                years = int(m4.group(1))
         info["premium_type"] = "年缴"
         info["annual_premium"] = annual
         info["pay_years"] = years
