@@ -156,6 +156,101 @@ async def family_parse(files: List[UploadFile] = File(...)):
     return JSONResponse({"policies": results})
 
 
+# OCR 懒加载（首次调用时才初始化，避免启动慢）
+_ocr_reader = None
+
+def _get_ocr_reader():
+    global _ocr_reader
+    if _ocr_reader is None:
+        import easyocr
+        _ocr_reader = easyocr.Reader(['ch_sim', 'en'], gpu=False)
+    return _ocr_reader
+
+
+@app.post("/api/family-parse-html")
+async def family_parse_html(files: List[UploadFile] = File(...)):
+    """接收多个HTML文件（保诚系统另存的页面），提取纯文本后解析基本信息。"""
+    results = []
+    for file in files:
+        data = await file.read()
+        if not data:
+            results.append({"filename": file.filename, "error": "空文件"})
+            continue
+        try:
+            text = data.decode("utf-8", errors="replace")
+            # 去掉HTML标签，提取纯文本
+            import re
+            text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.S | re.I)
+            text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.S | re.I)
+            text = re.sub(r"<[^>]+>", "\n", text)
+            text = re.sub(r"\n{3,}", "\n\n", text)
+            text = re.sub(r"[ \t]+", " ", text)
+            # 判断是保单详情页还是计划书
+            if "保單詳情" in text or "保單號碼" in text or "保单详情" in text or "保单号码" in text:
+                info = parser.parse_policy_detail_from_text(text)
+            else:
+                info = parser.parse_basic_from_text(text)
+            info["filename"] = file.filename
+            results.append(info)
+        except Exception as e:
+            results.append({"filename": file.filename, "error": f"HTML解析失败：{e}"})
+    return JSONResponse({"policies": results})
+
+
+@app.post("/api/family-parse-image")
+async def family_parse_image(files: List[UploadFile] = File(...)):
+    """接收多张图片（计划书截图），OCR 后提取基本信息。"""
+    results = []
+    for file in files:
+        data = await file.read()
+        if not data:
+            results.append({"filename": file.filename, "error": "空文件"})
+            continue
+        try:
+            import io
+            from PIL import Image
+            img = Image.open(io.BytesIO(data))
+            reader = _get_ocr_reader()
+            ocr_result = reader.readtext(img, detail=0, paragraph=True)
+            text = "\n".join(ocr_result)
+            info = parser.parse_basic_from_text(text)
+            info["filename"] = file.filename
+            info["ocr_text"] = text[:500]  # 前500字留作调试
+            results.append(info)
+        except Exception as e:
+            results.append({"filename": file.filename, "error": f"OCR解析失败：{e}"})
+    return JSONResponse({"policies": results})
+
+
+@app.post("/api/family-review-export-ppt")
+async def family_review_export_ppt(req: dict):
+    """生成家庭保单检视PPT。
+    请求体：{ policies: [...], client_name: "客户姓名" }
+    返回：pptx 文件下载
+    """
+    try:
+        import family_review_export
+        policies = req.get("policies", [])
+        client_name = req.get("client_name", "")
+        if not policies:
+            raise HTTPException(status_code=400, detail="没有保单数据")
+
+        buf = family_review_export.generate_family_review_ppt(policies, client_name=client_name)
+        filename = f"{client_name}家庭保单检视.pptx" if client_name else "家庭保单检视.pptx"
+        # 中文文件名做URL编码，避免latin-1编码错误
+        from urllib.parse import quote
+        filename_encoded = quote(filename)
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename_encoded}"}
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"生成PPT失败：{e}")
+
+
 @app.post("/api/renewal-parse")
 async def renewal_parse(file: UploadFile = File(...), rate: float = 7.9, dda_day: int = 6, include_monthly: bool = False):
     """接收 AES Premium Position Enquiry 另存的 HTML，返回按客户合并的续保名单。"""
@@ -294,7 +389,7 @@ async def family_export_ppt(payload: dict = None):
             return f"HK${v*usd_hkd:,.0f}"
 
         # Slide 1: 封面
-        add_title_slide("家庭保单规划方案", f"共 {len(policies)} 张保单 ｜ USD→HKD {usd_hkd}")
+        add_title_slide("方案对比", f"共 {len(policies)} 张保单 ｜ USD→HKD {usd_hkd}")
 
         # 收集所有家庭成员（按年龄排序）
         person_set = set()
