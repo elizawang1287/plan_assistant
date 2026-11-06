@@ -395,13 +395,23 @@ function render() {
       (p.rows||[]).forEach(r => allYears.add(r.year));
     });
     const years = Array.from(allYears).sort((a,b)=>a-b).filter(y => y % 5 === 0 || y === 1);
-    // 两行表头：第一行产品名（合并两列），第二行USD/RMB
+    // 两行表头：第一行产品名+保费（合并两列），第二行USD/RMB
+    // 生成表头产品名：产品简称 + 年缴保费
+    const prodLabels = detailData.map(p => {
+      const b = p.basic || p;
+      const ap = b.annual_premium;
+      const py = b.pay_years;
+      const shortName = (p.product_name || p.product_code || '').replace('保险计划', '').replace('多元货币', '').replace('定期寿险', '');
+      const premStr = ap ? (ap >= 10000 ? (ap/10000).toFixed(1) + '万' : ap.toLocaleString()) : '';
+      const pyStr = py ? `*${py}` : '';
+      return `${shortName} ${premStr}${pyStr}`;
+    });
     html += '<table style="font-size:11px;border-collapse:collapse;width:100%"><thead>';
     // 第一行表头
     html += '<tr>';
     html += '<th rowspan="2" style="border:1px solid #ccc;padding:8px 6px;background:var(--pr);color:#fff;font-weight:700">保单年度</th>';
-    detailData.forEach(p => {
-      html += `<th colspan="2" style="border:1px solid #ccc;padding:8px 6px;background:var(--pr);color:#fff;font-weight:700">${p.product_code}</th>`;
+    prodLabels.forEach(label => {
+      html += `<th colspan="2" style="border:1px solid #ccc;padding:8px 6px;background:var(--pr);color:#fff;font-weight:700">${label}</th>`;
     });
     html += '</tr>';
     // 第二行表头
@@ -427,18 +437,19 @@ function render() {
 
     // 保证 vs 非保证对比表
     html += '<div class="group-section"><div class="group-title">保证收益 vs 非保证收益</div>';
+    html += '<div style="font-size:12px;color:var(--gray);margin-bottom:8px">保证现金价值（无论市场表现如何，这部分金额确定可获得）</div>';
     // 两行表头
     html += '<table style="font-size:11px;border-collapse:collapse;width:100%"><thead>';
     html += '<tr>';
     html += '<th rowspan="2" style="border:1px solid #ccc;padding:8px 6px;background:var(--pr);color:#fff;font-weight:700">保单年度</th>';
-    detailData.forEach(p => {
-      html += `<th colspan="2" style="border:1px solid #ccc;padding:8px 6px;background:var(--pr);color:#fff;font-weight:700">${p.product_code}</th>`;
+    prodLabels.forEach(label => {
+      html += `<th colspan="2" style="border:1px solid #ccc;padding:8px 6px;background:var(--pr);color:#fff;font-weight:700">${label}</th>`;
     });
     html += '</tr>';
     html += '<tr>';
     detailData.forEach(p => {
-      html += '<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">保证</th>';
-      html += '<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">非保证</th>';
+      html += '<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">保证收益</th>';
+      html += '<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">非保证收益</th>';
     });
     html += '</tr></thead><tbody>';
     years.forEach(y => {
