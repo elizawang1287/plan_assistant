@@ -624,7 +624,7 @@ def parse_withdrawal(text, anb_age, product):
     if start_idx is None:
         return None
 
-    n_cols = 7 if product == "TRST" else 8
+    n_cols = 7 if product in ("TRST", "PACE") else 8
     rows = []
     i = start_idx
     n = len(lines)
@@ -649,7 +649,7 @@ def parse_withdrawal(text, anb_age, product):
                 j += 1
             if len(vals) >= n_cols:
                 age = (anb_age + year) if anb_age else None
-                if product == "TRST":
+                if product in ("TRST", "PACE"):
                     withdrawal, surrender = vals[1], vals[5]
                 else:
                     withdrawal, surrender = vals[-1], vals[5]
