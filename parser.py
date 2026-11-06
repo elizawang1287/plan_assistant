@@ -785,6 +785,7 @@ FAMILY_PRODUCT_NAMES = {
     "PLT20": "PLT20 守护家人定期寿险",
     "PLT10": "PLT10 守护家人定期寿险（10年续保）",
     "PLT5": "PLT5 守护家人定期寿险（5年续保）",
+    "PLT1": "PLT1 守护家人定期寿险（1年续保）",
     "PLT": "PLT 定期寿险",
     "CIT2": "CIT2 守护健康危疾定期保II",
     "CIT": "CIT 定期危疾",
@@ -811,6 +812,7 @@ FAMILY_PRODUCT_CATEGORY = {
     "PLT20": "定期寿险",
     "PLT10": "定期寿险",
     "PLT5": "定期寿险",
+    "PLT1": "定期寿险",
     "PLT": "定期寿险",
     "CPER": "医疗",
     "MCVIP": "医疗",
@@ -835,7 +837,8 @@ def detect_product_family(text):
     if "危疾首護" in text or "危疾首护" in text: return "CIP2"
     if "住院現金" in text or "住院现金" in text: return "ENCASH"
     if "守護家人" in text or "守护家人" in text:
-        # 按续保期区分 PLT5 / PLT10 / PLT20
+        # 按续保期区分 PLT1 / PLT5 / PLT10 / PLT20
+        if "(PLT1)" in text or "（PLT1）" in text: return "PLT1"
         if "(PLT5)" in text or "（PLT5）" in text: return "PLT5"
         if "(PLT10)" in text or "（PLT10）" in text: return "PLT10"
         if "(PLT20)" in text or "（PLT20）" in text: return "PLT20"
