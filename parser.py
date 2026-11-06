@@ -19,6 +19,7 @@ PRODUCT_NAMES = {
     "CIE3": "守护健康危疾加护保 III",
     "ENCASH": "保诚加护一生住院现金储蓄保险",
     "PHOR": "诚誉财富保险计划",
+    "PACE": "骏誉财富保险计划",
 }
 
 NUM = re.compile(r"^\d{1,3}(,\d{3})+(\.\d+)?$")  # 25,000 / 1,240,550
@@ -51,6 +52,8 @@ def detect_product(text):
         return "ENCASH"
     if "PHOR" in text or "誠譽財富" in text or "诚誉财富" in text:
         return "PHOR"
+    if "PACE" in text or "駿譽財富" in text or "骏誉财富" in text:
+        return "PACE"
     return "UNKNOWN"
 
 
@@ -189,7 +192,7 @@ def parse_surrender_table(text, anb_age, total_premium, product="PRMESP"):
     PRMESP 4列：paid(0), A保证(1), B红利(2), C退保总额(3)
     TRST 5列：paid(0), A保证(1), B归原红利(2), C终期红利(3), D退保总额(4)
     """
-    is_trst = product == "TRST"
+    is_trst = product in ("TRST", "PACE")
     n_cols = 5 if is_trst else 4
 
     def detect_trst_col_g(seg):
@@ -774,12 +777,14 @@ FAMILY_PRODUCT_NAMES = {
     "LFRE2": "LFRE2 自主未来II",
     "PLP2": "PLP2 美好人寿II",
     "PHOR": "PHOR 诚誉财富保险计划",
+    "PACE": "PACE 骏誉财富保险计划",
 }
 
 FAMILY_PRODUCT_CATEGORY = {
     "PRMESP": "储蓄/退休",
     "TRST": "储蓄/退休",
     "PHOR": "储蓄/退休",
+    "PACE": "储蓄/退休",
     "CIM3": "危疾",
     "CIE3": "危疾",
     "CIP2": "危疾",
@@ -820,6 +825,7 @@ def detect_product_family(text):
     if "自主未來" in text or "自主未来" in text: return "LFRE2"
     if "美好人壽" in text or "美好人寿" in text: return "PLP2"
     if "誠譽財富" in text or "诚誉财富" in text: return "PHOR"
+    if "駿譽財富" in text or "骏誉财富" in text: return "PACE"
     return "UNKNOWN"
 
 
