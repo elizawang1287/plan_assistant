@@ -75,6 +75,23 @@
 
 <div class="wrap">
 
+  <div style="display:flex;gap:12px;margin-bottom:16px;justify-content:center">
+    <label style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:10px 20px;border:2px solid var(--pr);border-radius:10px;background:#fff">
+      <input type="radio" name="mode" value="simple" checked style="accent-color:var(--pr)">
+      <div>
+        <div style="font-weight:700;font-size:14px">简单方案对比</div>
+        <div style="font-size:11px;color:var(--gray)">快速解析（5-15秒），显示保额/年缴/供款期</div>
+      </div>
+    </label>
+    <label style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:10px 20px;border:2px solid var(--line);border-radius:10px;background:#fafafa">
+      <input type="radio" name="mode" value="detail" style="accent-color:var(--pr)">
+      <div>
+        <div style="font-weight:700;font-size:14px">详细方案对比</div>
+        <div style="font-size:11px;color:var(--gray)">完整解析（30-60秒），含退保价值/保证收益对比</div>
+      </div>
+    </label>
+  </div>
+
   <div class="drop" id="drop">
     <b>拖拽多个计划书 PDF 到这里</b><br>
     <span style="font-size:12px">或点击选择文件（支持批量上传）</span>
@@ -125,17 +142,25 @@ let fileInput = initDrop();
 
 async function uploadFiles(files) {
   if (!files.length) return;
-  // 存文件对象，供后续详细解析用
+  // 存文件对象
   window._uploadedFiles = files;
+  // 获取模式
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  window._mode = mode;
   // 显示加载状态
   drop.classList.add('loading');
-  drop.innerHTML = '<span class="spinner"></span><b>正在解析 PDF，请稍候...</b><br><span style="font-size:12px;color:var(--gray);margin-top:8px;display:inline-block">每份保单约需 5-15 秒，请耐心等待</span>';
+  const loadingText = mode === 'detail'
+    ? '<span class="spinner"></span><b>正在完整解析 PDF，请稍候...</b><br><span style="font-size:12px;color:var(--gray);margin-top:8px;display:inline-block">详细模式每份保单约需 10-20 秒，请耐心等待</span>'
+    : '<span class="spinner"></span><b>正在解析 PDF，请稍候...</b><br><span style="font-size:12px;color:var(--gray);margin-top:8px;display:inline-block">每份保单约需 5-15 秒，请耐心等待</span>';
+  drop.innerHTML = loadingText;
   statusEl.textContent = `正在解析 ${files.length} 个文件...`;
   statusEl.classList.add('loading');
   const fd = new FormData();
   for (const f of files) fd.append('files', f);
+  // 根据模式调用不同接口
+  const apiUrl = mode === 'detail' ? '/api/family-detail' : '/api/family-parse';
   try {
-    const resp = await fetch('/api/family-parse', { method: 'POST', body: fd });
+    const resp = await fetch(apiUrl, { method: 'POST', body: fd });
     const data = await resp.json();
     if (data.detail) { statusEl.textContent = '错误：' + data.detail; return; }
     for (const p of data.policies) {
@@ -147,8 +172,12 @@ async function uploadFiles(files) {
     }
     rateBar.style.display = 'flex';
     toolbar.style.display = 'flex';
+    // 详细模式存detailData
+    if (mode === 'detail') {
+      window._detailData = data.policies;
+    }
     render();
-    statusEl.textContent = `已解析 ${policies.length} 张保单`;
+    statusEl.textContent = `已解析 ${policies.length} 张保单（${mode === 'detail' ? '详细模式' : '简单模式'}）`;
   } catch (e) {
     statusEl.textContent = '上传失败：' + e.message;
   } finally {
@@ -339,7 +368,86 @@ const PRODUCT_DESC = {
 
 function render() {
   if (!policies.length) { resultArea.innerHTML = ''; return; }
+  const mode = window._mode || 'simple';
   let html = '';
+
+  // ===== 详细模式：只显示详细对比表 =====
+  if (mode === 'detail') {
+    const detailData = window._detailData || policies;
+    // 总缴费表
+    html += '<div class="group-section"><div class="group-title">总缴费对比</div>';
+    html += '<table style="font-size:12px"><thead><tr><th style="text-align:left">产品</th><th>年缴(USD)</th><th>供款期</th><th>总保费(USD)</th><th>总保费(HKD)</th></tr></thead><tbody>';
+    detailData.forEach(p => {
+      const b = p.basic || p;
+      const ap = b.annual_premium;
+      const py = b.pay_years;
+      const tp = b.total_premium;
+      const r = parseFloat(rateHkd.value)||7.8;
+      html += `<tr><td style="text-align:left">${p.product_name}</td><td>$${(ap||0).toLocaleString()}</td><td>${py||'—'}年</td><td>$${(tp||0).toLocaleString()}</td><td>HK$${Math.round((tp||0)*r).toLocaleString()}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+
+    // 退保价值对比表
+    html += '<div class="group-section"><div class="group-title">退保价值对比（正常预期）</div>';
+    // 收集所有年度
+    const allYears = new Set();
+    detailData.forEach(p => {
+      (p.rows||[]).forEach(r => allYears.add(r.year));
+    });
+    const years = Array.from(allYears).sort((a,b)=>a-b).filter(y => y % 5 === 0 || y === 1);
+    // 表头
+    let headers = ['保单年度'];
+    detailData.forEach(p => {
+      headers.push(p.product_code + '(USD)');
+      headers.push(p.product_code + '(RMB)');
+    });
+    html += '<table style="font-size:11px"><thead><tr>';
+    headers.forEach(h => html += `<th>${h}</th>`);
+    html += '</tr></thead><tbody>';
+    const rRmb = parseFloat(rateRmb.value)||7.2;
+    years.forEach(y => {
+      html += `<tr><td style="font-weight:700">第${y}年</td>`;
+      detailData.forEach(p => {
+        const row = (p.rows||[]).find(r => r.year === y);
+        const sv = row ? row.surrender : null;
+        const svStr = sv ? (sv/10000).toFixed(1) + '万' : '—';
+        const svRmbStr = sv ? (sv*rRmb/10000).toFixed(1) + '万' : '—';
+        html += `<td style="white-space:nowrap">${svStr}</td><td style="white-space:nowrap;color:var(--pr)">${svRmbStr}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+
+    // 保证 vs 非保证对比表
+    html += '<div class="group-section"><div class="group-title">保证收益 vs 非保证收益</div>';
+    let headers2 = ['保单年度'];
+    detailData.forEach(p => {
+      headers2.push(p.product_code + ' 保证');
+      headers2.push(p.product_code + ' 非保证');
+    });
+    html += '<table style="font-size:11px"><thead><tr>';
+    headers2.forEach(h => html += `<th>${h}</th>`);
+    html += '</tr></thead><tbody>';
+    years.forEach(y => {
+      html += `<tr><td style="font-weight:700">第${y}年</td>`;
+      detailData.forEach(p => {
+        const row = (p.rows||[]).find(r => r.year === y);
+        const g = row ? (row.guaranteed || 0) : 0;
+        const ng = row ? ((row.surrender || 0) - (row.guaranteed || 0)) : 0;
+        const gStr = g ? (g/10000).toFixed(1) + '万' : '—';
+        const ngStr = ng > 0 ? (ng/10000).toFixed(1) + '万' : '—';
+        html += `<td style="white-space:nowrap;background:#f0f5ff">${gStr}</td><td style="white-space:nowrap;background:#fff5f0">${ngStr}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="font-size:11px;color:var(--gray);margin-top:8px;padding:0 16px">保证收益为保险公司承诺的最低现金价值，不包含非保证红利与终期分红</div>';
+
+    resultArea.innerHTML = html;
+    return;
+  }
+
+  // ===== 简单模式：显示现在的简单对比表 =====
 
   // ===== 1. 全部保单可编辑表（折叠，修改/删除数据用） =====
   const editOpen = window._editOpen || false;
@@ -512,124 +620,7 @@ function render() {
     html += '</div>';
   }
 
-  // ===== 5. 详细方案对比（需要点击加载） =====
-  const detailOpen = window._detailOpen || false;
-  const detailLoaded = window._detailData != null;
-  html += `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="window._detailOpen=!window._detailOpen;render()">`;
-  html += `<div style="font-size:14px;font-weight:700">详细方案对比<span style="color:var(--gray);font-weight:400;margin-left:8px">退保价值/保证收益对比</span></div>`;
-  html += `<div style="color:var(--pr);font-size:13px;font-weight:600">${detailOpen ? '收起 ▲' : '展开 ▼'}</div>`;
-  html += '</div>';
-
-  if (detailOpen) {
-    if (!detailLoaded) {
-      html += `<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:30px;text-align:center;margin-bottom:16px">`;
-      html += `<div style="font-size:14px;color:var(--gray);margin-bottom:16px">需要完整解析退保价值表，约需 30-60 秒</div>`;
-      html += `<button onclick="loadDetail()" style="background:var(--pr);color:#fff;border:none;padding:10px 30px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">加载详细数据</button>`;
-      html += '</div>';
-    } else {
-      // 渲染详细对比表
-      const detailData = window._detailData;
-      // 总缴费表
-      html += '<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px">';
-      html += '<div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--pr)">总缴费对比</div>';
-      html += '<table style="font-size:12px"><thead><tr><th style="text-align:left">产品</th><th>年缴(USD)</th><th>供款期</th><th>总保费(USD)</th><th>总保费(HKD)</th></tr></thead><tbody>';
-      detailData.forEach(p => {
-        const b = p.basic || {};
-        const ap = b.annual_premium;
-        const py = b.pay_years;
-        const tp = b.total_premium;
-        const r = parseFloat(rateHkd.value)||7.8;
-        html += `<tr><td style="text-align:left">${p.product_name}</td><td>$${(ap||0).toLocaleString()}</td><td>${py||'—'}年</td><td>$${(tp||0).toLocaleString()}</td><td>HK$${Math.round((tp||0)*r).toLocaleString()}</td></tr>`;
-      });
-      html += '</tbody></table></div>';
-
-      // 退保价值对比表
-      html += '<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px">';
-      html += '<div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--pr)">退保价值对比（正常预期）</div>';
-      // 收集所有年度
-      const allYears = new Set();
-      detailData.forEach(p => {
-        (p.rows||[]).forEach(r => allYears.add(r.year));
-      });
-      const years = Array.from(allYears).sort((a,b)=>a-b).filter(y => y % 5 === 0 || y === 1); // 每5年一行
-      // 表头：保单年度 | 产品1(美元/人民币) | 产品2(美元/人民币) ...
-      let headers = ['保单年度'];
-      detailData.forEach(p => {
-        headers.push(p.product_code + '(USD)');
-        headers.push(p.product_code + '(RMB)');
-      });
-      html += '<table style="font-size:11px"><thead><tr>';
-      headers.forEach(h => html += `<th>${h}</th>`);
-      html += '</tr></thead><tbody>';
-      const rRmb = parseFloat(rateRmb.value)||7.2;
-      years.forEach(y => {
-        html += `<tr><td style="font-weight:700">第${y}年</td>`;
-        detailData.forEach(p => {
-          const row = (p.rows||[]).find(r => r.year === y);
-          const sv = row ? row.surrender : null;
-          const svStr = sv ? (sv/10000).toFixed(1) + '万' : '—';
-          const svRmbStr = sv ? (sv*rRmb/10000).toFixed(1) + '万' : '—';
-          html += `<td style="white-space:nowrap">${svStr}</td><td style="white-space:nowrap;color:var(--pr)">${svRmbStr}</td>`;
-        });
-        html += '</tr>';
-      });
-      html += '</tbody></table></div>';
-
-      // 保证 vs 非保证对比表
-      html += '<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px">';
-      html += '<div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--pr)">保证收益 vs 非保证收益</div>';
-      let headers2 = ['保单年度'];
-      detailData.forEach(p => {
-        headers2.push(p.product_code + ' 保证');
-        headers2.push(p.product_code + ' 非保证');
-      });
-      html += '<table style="font-size:11px"><thead><tr>';
-      headers2.forEach(h => html += `<th>${h}</th>`);
-      html += '</tr></thead><tbody>';
-      years.forEach(y => {
-        html += `<tr><td style="font-weight:700">第${y}年</td>`;
-        detailData.forEach(p => {
-          const row = (p.rows||[]).find(r => r.year === y);
-          const g = row ? (row.guaranteed || 0) : 0;
-          const ng = row ? ((row.surrender || 0) - (row.guaranteed || 0)) : 0;
-          const gStr = g ? (g/10000).toFixed(1) + '万' : '—';
-          const ngStr = ng > 0 ? (ng/10000).toFixed(1) + '万' : '—';
-          html += `<td style="white-space:nowrap;background:#f0f5ff">${gStr}</td><td style="white-space:nowrap;background:#fff5f0">${ngStr}</td>`;
-        });
-        html += '</tr>';
-      });
-      html += '</tbody></table>';
-      html += '<div style="font-size:11px;color:var(--gray);margin-top:8px">保证收益为保险公司承诺的最低现金价值，不包含非保证红利与终期分红</div>';
-      html += '</div>';
-    }
-  }
-
   resultArea.innerHTML = html;
-}
-
-// 加载详细数据
-async function loadDetail() {
-  if (!window._uploadedFiles || !window._uploadedFiles.length) {
-    alert('请先上传PDF文件');
-    return;
-  }
-  statusEl.textContent = '正在完整解析退保价值表...（约需30-60秒）';
-  statusEl.classList.add('loading');
-  const fd = new FormData();
-  for (const f of window._uploadedFiles) fd.append('files', f);
-  try {
-    const resp = await fetch('/api/family-detail', { method: 'POST', body: fd });
-    const data = await resp.json();
-    if (data.detail) { statusEl.textContent = '错误：' + data.detail; return; }
-    window._detailData = data.policies;
-    window._detailOpen = true;
-    render();
-    statusEl.textContent = '详细数据已加载';
-  } catch (e) {
-    statusEl.textContent = '加载失败：' + e.message;
-  } finally {
-    statusEl.classList.remove('loading');
-  }
 }
 
 document.getElementById('rateHkd').oninput = render;
