@@ -344,13 +344,45 @@ function render(data, fname){
     <tr><td>${b.anb_age}岁/${b.gender||''}</td>
         <td>${b.premium_type}${b.pay_years>1?('·'+b.pay_years+'年'):''}</td>
         <td>${b.annual_premium?fmt(b.annual_premium):'-'}</td>
-        <td>${b.total_premium?fmt(b.total_premium):'-'}</td></tr>`;
+        <td>${b.total_premium?fmt(b.total_premium):'-'}</td></tr>
+    <tr><td colspan="2" style="text-align:right;color:var(--gray);font-size:12px">优惠比例（可选）：</td>
+        <td colspan="2" style="text-align:left">
+          <input type="number" id="discountPct" value="0" min="0" max="50" step="0.5" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:13px">
+          <span style="font-size:12px;color:var(--gray)">%（输入后自动计算实际回报率）</span>
+        </td></tr>`;
+
+  // 计算实际单利/复利（扣除优惠后）
+  const calcActualPct = (r, discountPct) => {
+    if (!b.total_premium || !discountPct) return { simple: r.simple_pct, compound: r.compound_pct };
+    const actualTotal = b.total_premium * (1 - discountPct / 100);
+    const yr = r.year || 1;
+    const payYears = b.pay_years || 1;
+    const avgYears = yr - (payYears - 1) / 2;
+    // 实际单利
+    let simple = null;
+    if (r.surrender > actualTotal && avgYears > 0) {
+      simple = Math.round((r.surrender - actualTotal) / actualTotal / avgYears * 1000) / 10;
+    } else if (r.surrender > 0) {
+      simple = Math.round((r.surrender - actualTotal) / actualTotal / yr * 1000) / 10;
+    }
+    // 实际复利（近似公式）
+    let compound = null;
+    if (r.surrender > 0 && yr > 0) {
+      compound = Math.round((Math.pow(r.surrender / actualTotal, 1 / yr) - 1) * 1000) / 10;
+    }
+    return { simple, compound };
+  };
 
   // 正常预期退保价值表（PPT：年度|美元|人民币|单利|复利）
   const rowCls = r => r.is_age_marker ? ' class="age-row"' : (isBE(r) ? ' class="be-row"' : '');
   const pctStr = v => (v != null && v > 0) ? v+'%' : '/';
-  const normalHtml = rows.map(r=>
-    `<tr${rowCls(r)}><td>${ylab(r)}</td><td>${wU(r.surrender)}</td><td>${wR(r.surrender)}</td><td>${pctStr(r.simple_pct)}</td><td>${pctStr(r.compound_pct)}</td></tr>`).join('');
+  const renderNormalTable = (discountPct) => {
+    return rows.map(r=>{
+      const { simple, compound } = calcActualPct(r, discountPct);
+      return `<tr${rowCls(r)}><td>${ylab(r)}</td><td>${wU(r.surrender)}</td><td>${wR(r.surrender)}</td><td>${pctStr(simple)}</td><td>${pctStr(compound)}</td></tr>`;
+    }).join('');
+  };
+  const normalHtml = renderNormalTable(0);
 
   // 乐观预期退保价值表（仅 PRMESP 有）
   const hasOpt = data.optimistic && Object.keys(data.optimistic).length > 0;
@@ -472,6 +504,26 @@ function render(data, fname){
       <div class="disc">*内容及数字仅做参考 以合约为准 · 非保证利益可能调整</div>
     </div>`;
   card.style.display='block';
+
+  // 优惠比例输入框：实时更新退保价值表的单利/复利
+  const discountInput = document.getElementById('discountPct');
+  if (discountInput) {
+    discountInput.oninput = () => {
+      const pct = parseFloat(discountInput.value) || 0;
+      // 找到退保价值表（正常预期）
+      const tables = card.querySelectorAll('table.w-table');
+      if (tables.length > 0) {
+        const table = tables[0]; // 第一个w-table是正常预期退保价值表
+        const hdrRow = table.rows[0].cloneNode(true);
+        const newHtml = renderNormalTable(pct);
+        table.innerHTML = '';
+        table.appendChild(hdrRow);
+        const tmpDiv = document.createElement('div');
+        tmpDiv.innerHTML = '<table><tbody>' + newHtml + '</tbody></table>';
+        tmpDiv.querySelectorAll('tr').forEach(tr => table.appendChild(tr));
+      }
+    };
+  }
 
   // 摘要文字
   const last = rows[rows.length-1];
