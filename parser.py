@@ -916,8 +916,32 @@ def parse_basic_from_text(text):
     # 纯储蓄险产品（保额不适用）：TRST、PRMESP
     # LFRE2 是有保额的（定期寿险+储蓄），需要提取保额
     savings_no_sum = {"TRST", "PRMESP"}
+    # 定期寿险产品（PLT系列）：表格布局特殊，需单独提取保额
+    term_life_products = {"PLT1", "PLT5", "PLT10", "PLT20", "PLT"}
     if product in savings_no_sum:
         sum_assured = None
+    elif product in term_life_products:
+        # 定期寿险：从产品代码括号往后找所有数字，排除年缴和<100的，剩下的就是保额
+        sum_assured = None
+        m = re.search(r"\(\s*(" + "|".join(term_life_products) + r")\s*\)", text)
+        if m:
+            # 产品名后面的500字符
+            tail = text[m.end():m.end()+500]
+            numbers = re.findall(r"([\d,]+\.?\d*)", tail)
+            for num_str in numbers:
+                val = _to_num(num_str)
+                if not val:
+                    continue
+                # 排除年缴
+                if annual_premium and abs(val - annual_premium) < 1:
+                    continue
+                # 排除供款期/保障年期（< 100的数字）
+                if val < 100:
+                    continue
+                # 剩下的大数字就是保额
+                if val > 10000:
+                    sum_assured = val
+                    break
     else:
         # 保额：找产品名后面的数字，排除年缴和供款期
         sum_assured = None
