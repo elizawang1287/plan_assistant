@@ -437,8 +437,8 @@ function render() {
     html += '</tr>';
     html += '<tr>';
     detailData.forEach(p => {
-      html += '<th style="border:1px solid #ccc;padding:6px;background:#e8f0ff;color:#333;font-weight:600">保证</th>';
-      html += '<th style="border:1px solid #ccc;padding:6px;background:#fff0e8;color:#333;font-weight:600">非保证</th>';
+      html += '<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">保证</th>';
+      html += '<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">非保证</th>';
     });
     html += '</tr></thead><tbody>';
     years.forEach(y => {
