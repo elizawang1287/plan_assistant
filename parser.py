@@ -913,9 +913,9 @@ def parse_basic_from_text(text):
             break
     info["annual_premium"] = annual_premium
 
-    # 纯储蓄险产品（保额不适用）：TRST、PRMESP
-    # LFRE2 是有保额的（定期寿险+储蓄），需要提取保额
-    savings_no_sum = {"TRST", "PRMESP"}
+    # 纯储蓄险产品（保额不适用）：PRMESP
+    # TRST/PHOR/PACE等储蓄险也从PDF提取总保费作为"总保额"显示
+    savings_no_sum = {"PRMESP"}
     # 定期寿险产品（PLT系列）：表格布局特殊，需单独提取保额
     term_life_products = {"PLT1", "PLT5", "PLT10", "PLT20", "PLT"}
     if product in savings_no_sum:
