@@ -407,8 +407,8 @@ function render() {
     // 第二行表头
     html += '<tr>';
     detailData.forEach(p => {
-      html += '<th style="border:1px solid #ccc;padding:6px;background:#f8f9fa;color:#333;font-weight:600">USD</th>';
-      html += '<th style="border:1px solid #ccc;padding:6px;background:#f8f9fa;color:#333;font-weight:600">RMB</th>';
+      html += '<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">USD</th>';
+      html += '<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">RMB</th>';
     });
     html += '</tr></thead><tbody>';
     const rRmb = parseFloat(rateRmb.value)||7.2;
