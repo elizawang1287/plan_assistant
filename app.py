@@ -9,7 +9,7 @@ import re
 import tempfile
 import os
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from typing import List
@@ -223,21 +223,52 @@ async def family_parse_image(files: List[UploadFile] = File(...)):
 
 
 @app.post("/api/family-review-export-ppt")
-async def family_review_export_ppt(req: dict):
+async def family_review_export_ppt(
+    policies: str = Form(...),
+    extract_files: List[UploadFile] = File(default=[]),
+    shot_files: List[UploadFile] = File(default=[])
+):
     """生成家庭保单检视PPT。
-    请求体：{ policies: [...], client_name: "客户姓名" }
+    FormData:
+      - policies: JSON字符串，保单列表
+      - extract_files: 提取方案文件列表（PDF/图片）
+      - shot_files: 财务概览文件列表（PDF/图片）
     返回：pptx 文件下载
     """
     try:
+        import json
         import family_review_export
-        policies = req.get("policies", [])
-        client_name = req.get("client_name", "")
-        if not policies:
+        policies_list = json.loads(policies)
+        if not policies_list:
             raise HTTPException(status_code=400, detail="没有保单数据")
 
-        buf = family_review_export.generate_family_review_ppt(policies, client_name=client_name)
-        filename = f"{client_name}家庭保单检视.pptx" if client_name else "家庭保单检视.pptx"
-        # 中文文件名做URL编码，避免latin-1编码错误
+        # 保存提取方案文件到临时目录
+        import tempfile
+        extract_paths = []
+        for f in extract_files:
+            data = await f.read()
+            ext = f.filename.split('.')[-1] if '.' in f.filename else 'pdf'
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+            tmp.write(data)
+            tmp.close()
+            extract_paths.append(tmp.name)
+
+        # 保存财务概览文件到临时目录
+        shot_paths = []
+        for f in shot_files:
+            data = await f.read()
+            ext = f.filename.split('.')[-1] if '.' in f.filename else 'pdf'
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+            tmp.write(data)
+            tmp.close()
+            shot_paths.append(tmp.name)
+
+        buf = family_review_export.generate_family_review_ppt(
+            policies_list,
+            extract_paths=extract_paths,
+            shot_paths=shot_paths
+        )
+        filename = "家庭保单检视.pptx"
         from urllib.parse import quote
         filename_encoded = quote(filename)
         return StreamingResponse(

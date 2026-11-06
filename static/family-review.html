@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家庭保单检视 · 计划书助手</title>
+<style>
+  :root{
+    --pr:#e60012; --pr-dark:#c00010; --ink:#222; --gray:#888;
+    --line:#eee; --bg:#f5f6f8; --green:#0a7a3d; --blue:#1f5fbf;
+    --gold:#b8860b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--ink);}
+  header{background:#fff;padding:14px 22px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);}
+  header a{text-decoration:none;color:var(--gray);font-size:13px;}
+  header .logo{font-size:18px;font-weight:700;color:var(--pr);}
+  header .sub{font-size:12px;color:var(--gray);}
+  .wrap{max-width:1100px;margin:20px auto;padding:0 16px;}
+
+  .section{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px;}
+  .section-title{font-size:16px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+  .section-desc{font-size:13px;color:var(--gray);margin-bottom:14px;line-height:1.6;}
+  .section-badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+  .badge-pdf{background:#fdeeee;color:var(--pr);}
+  .badge-ext{background:#eef6ee;color:var(--green);}
+  .badge-shot{background:#eaf1fb;color:var(--blue);}
+
+  .drop{border:2px dashed #cfd3da;border-radius:10px;background:#fafbfc;padding:24px 16px;
+        text-align:center;color:var(--gray);cursor:pointer;transition:.2s;}
+  .drop:hover,.drop.over{border-color:var(--pr);color:var(--pr);background:#fff5f6;}
+  .drop b{color:var(--ink);}
+  .drop.has-file{border-style:solid;border-color:var(--green);background:#f6fcf8;}
+
+  .file-list{margin-top:12px;}
+  .file-item{display:flex;align-items:center;justify-content:space-between;
+             padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px;}
+  .file-item:last-child{border-bottom:none;}
+  .file-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:12px;}
+  .file-meta{font-size:11px;color:var(--gray);white-space:nowrap;margin-right:12px;}
+  .file-remove{border:none;background:#fdeeee;color:var(--pr);padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;}
+  .file-error{color:var(--pr);font-size:11px;margin-left:8px;}
+
+  .cat-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;}
+  .cat-危疾{background:#fdeeee;color:var(--pr);}
+  .cat-医疗{background:#eaf1fb;color:var(--blue);}
+  .cat-储蓄{background:#e8f6ee;color:var(--green);}
+  .cat-寿险{background:#f6efdf;color:#8a5b00;}
+  .cat-其他{background:#eef0f3;color:var(--gray);}
+
+  .toolbar{display:flex;gap:10px;margin:20px 0;flex-wrap:wrap;align-items:center;}
+  .btn{border:none;border-radius:8px;padding:10px 22px;font-size:14px;cursor:pointer;font-weight:600;}
+  .btn-primary{background:var(--pr);color:#fff;}
+  .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--line);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .status{font-size:13px;color:var(--gray);}
+
+  .progress-bar{background:#eee;border-radius:20px;height:8px;margin:16px 0;overflow:hidden;}
+  .progress-fill{background:var(--pr);height:100%;border-radius:20px;transition:width .3s;}
+
+  .summary-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:16px;}
+  .summary-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;}
+  .summary-row .label{color:var(--gray);}
+  .summary-row .value{font-weight:600;}
+
+  table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:10px;overflow:hidden;margin-top:12px;}
+  th{background:var(--pr);color:#fff;font-weight:600;padding:8px 6px;text-align:center;white-space:nowrap;}
+  td{border:1px solid var(--line);padding:6px;text-align:center;}
+  tr:nth-child(even) td{background:#fafafa;}
+</style>
+</head>
+<body>
+<header>
+  <a href="/">← 返回</a>
+  <div>
+    <div class="logo">家庭保单检视</div>
+    <div class="sub">上传已有保单材料，生成家庭保单检视报告</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- 说明 -->
+  <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+    <div style="font-size:14px;font-weight:700;margin-bottom:8px;">检视所需材料清单</div>
+    <div style="font-size:13px;color:var(--gray);line-height:1.8;">
+      按以下三类整理材料上传，系统会自动解析保单信息并生成检视 PPT。<br>
+      <span style="color:var(--pr)">*</span> 标记为必填项，财务概览截图建议全部上传以获得最准确的检视结果。
+    </div>
+  </div>
+
+  <!-- 1. 保单计划书 PDF -->
+  <div class="section">
+    <div class="section-title">
+      1. 保单详情页 <span class="section-badge badge-pdf">HTML / PDF / 图片 · 必填</span>
+    </div>
+    <div class="section-desc">
+      每个保单从保诚系统查到的「保单详情」页，另存为HTML上传。<br>
+      HTML 会自动解析基本信息做汇总表；如果只有截图也可以传，走OCR识别。
+    </div>
+    <div class="drop" id="dropPdf">
+      <b>拖拽保单详情页 HTML / PDF / 截图到这里</b><br>
+      <span style="font-size:12px">或点击选择文件（支持批量上传，HTML / PDF / PNG / JPG）</span>
+      <input type="file" id="fileInputPdf" multiple accept=".pdf,.html,.htm,image/png,image/jpg,image/jpeg" style="display:none">
+    </div>
+    <div class="file-list" id="listPdf"></div>
+  </div>
+
+  <!-- 2. 提取方案计划书 -->
+  <div class="section">
+    <div class="section-title">
+      2. 提取方案计划书 <span class="section-badge badge-ext">PDF / HTML / 图片 · 储蓄险专用</span>
+    </div>
+    <div class="section-desc">
+      储蓄分红险（隽富EGC、世誉PRMESP等）的不同提取方案页面。<br>
+      每个提取方案一份，直接收集贴入PPT，用于制作提取详情页。
+    </div>
+    <div class="drop" id="dropExtract">
+      <b>拖拽提取方案页面 PDF / HTML / 截图到这里</b><br>
+      <span style="font-size:12px">或点击选择文件（支持批量上传，PDF / HTML / PNG / JPG）</span>
+      <input type="file" id="fileInputExtract" multiple accept=".pdf,.html,.htm,image/png,image/jpg,image/jpeg" style="display:none">
+    </div>
+    <div class="file-list" id="listExtract"></div>
+  </div>
+
+  <!-- 3. 财务概览截图 -->
+  <div class="section">
+    <div class="section-title">
+      3. 当前财务概览截图 <span class="section-badge badge-shot">图片 · 建议全传</span>
+    </div>
+    <div class="section-desc">
+      每个保单的「当前财务概览」截图（如 2026年10月），包含当前现金价值、累计已交保费等实际数据。<br>
+      用于制作检视时点的财务概览页。
+    </div>
+    <div class="drop" id="dropShot">
+      <b>拖拽财务概览截图或PDF到这里</b><br>
+      <span style="font-size:12px">或点击选择文件（支持批量上传，PNG / JPG / PDF）</span>
+      <input type="file" id="fileInputShot" multiple accept="image/png,image/jpg,image/jpeg,.pdf,.html,.htm" style="display:none">
+    </div>
+    <div class="file-list" id="listShot"></div>
+  </div>
+
+  <!-- 进度条 -->
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+  </div>
+
+  <!-- 工具栏 -->
+  <div class="toolbar">
+    <button class="btn btn-primary" id="btnExport" disabled>生成检视 PPT</button>
+    <button class="btn btn-ghost" id="btnClear">清空全部</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <!-- 解析结果 -->
+  <div id="resultArea"></div>
+
+</div>
+
+<script>
+// ===== 状态 =====
+let policies = [];        // 从计划书PDF解析出的保单
+let planImages = [];      // 计划书图片文件（不解析，直接收集）
+let extractFiles = [];    // 提取方案文件列表（PDF+图片，都不解析）
+let shotFiles = [];       // 财务概览截图列表
+
+const statusEl = document.getElementById('status');
+
+// ===== 拖拽上传：计划书PDF =====
+const dropPdf = document.getElementById('dropPdf');
+const fileInputPdf = document.getElementById('fileInputPdf');
+dropPdf.onclick = () => fileInputPdf.click();
+dropPdf.ondragover = e => { e.preventDefault(); dropPdf.classList.add('over'); };
+dropPdf.ondragleave = () => dropPdf.classList.remove('over');
+dropPdf.ondrop = e => {
+  e.preventDefault(); dropPdf.classList.remove('over');
+  uploadPdfFiles(e.dataTransfer.files);
+};
+fileInputPdf.onchange = () => uploadPdfFiles(fileInputPdf.files);
+
+// ===== 拖拽上传：提取方案PDF =====
+const dropExtract = document.getElementById('dropExtract');
+const fileInputExtract = document.getElementById('fileInputExtract');
+dropExtract.onclick = () => fileInputExtract.click();
+dropExtract.ondragover = e => { e.preventDefault(); dropExtract.classList.add('over'); };
+dropExtract.ondragleave = () => dropExtract.classList.remove('over');
+dropExtract.ondrop = e => {
+  e.preventDefault(); dropExtract.classList.remove('over');
+  addExtractFiles(e.dataTransfer.files);
+};
+fileInputExtract.onchange = () => addExtractFiles(fileInputExtract.files);
+
+// ===== 拖拽上传：财务概览截图 =====
+const dropShot = document.getElementById('dropShot');
+const fileInputShot = document.getElementById('fileInputShot');
+dropShot.onclick = () => fileInputShot.click();
+dropShot.ondragover = e => { e.preventDefault(); dropShot.classList.add('over'); };
+dropShot.ondragleave = () => dropShot.classList.remove('over');
+dropShot.ondrop = e => {
+  e.preventDefault(); dropShot.classList.remove('over');
+  addShotFiles(e.dataTransfer.files);
+};
+fileInputShot.onchange = () => addShotFiles(fileInputShot.files);
+
+// ===== 上传计划书：PDF和图片都解析，图片走OCR =====
+async function uploadPdfFiles(files) {
+  if (!files.length) return;
+  // 分离PDF、HTML和图片
+  const pdfFiles = [];
+  const htmlFiles = [];
+  const imgFiles = [];
+  for (const f of files) {
+    const ext = f.name.toLowerCase().split('.').pop();
+    if (ext === 'pdf') {
+      pdfFiles.push(f);
+    } else if (ext === 'html' || ext === 'htm') {
+      htmlFiles.push(f);
+    } else {
+      imgFiles.push(f);
+    }
+  }
+  let total = 0;
+
+  // PDF调用解析API
+  if (pdfFiles.length) {
+    statusEl.textContent = `正在解析 ${pdfFiles.length} 份PDF计划书...`;
+    const fd = new FormData();
+    for (const f of pdfFiles) fd.append('files', f);
+    try {
+      const resp = await fetch('/api/family-parse', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (data.detail) { statusEl.textContent = '错误：' + data.detail; return; }
+      for (const p of data.policies) {
+        if (p.error) {
+          policies.push({ filename: p.filename, product_name: '解析失败', category: '其他', age: null, gender: null, sum_assured: null, annual_premium: null, pay_years: null, error: p.error });
+        } else {
+          policies.push(p);
+        }
+      }
+      total += pdfFiles.length;
+    } catch (e) {
+      statusEl.textContent = 'PDF解析失败：' + e.message;
+    }
+  }
+
+  // HTML调用解析接口
+  if (htmlFiles.length) {
+    statusEl.textContent = `正在解析 ${htmlFiles.length} 份保单详情页...`;
+    const fd = new FormData();
+    for (const f of htmlFiles) fd.append('files', f);
+    try {
+      const resp = await fetch('/api/family-parse-html', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (data.detail) { statusEl.textContent = 'HTML解析错误：' + data.detail; }
+      else {
+        for (const p of data.policies) {
+          if (p.error) {
+            policies.push({ filename: p.filename, product_name: '解析失败', category: '其他', age: null, gender: null, sum_assured: null, annual_premium: null, pay_years: null, error: p.error });
+          } else {
+            policies.push(p);
+          }
+        }
+        total += htmlFiles.length;
+      }
+    } catch (e) {
+      statusEl.textContent = 'HTML解析失败：' + e.message;
+    }
+  }
+
+  // 图片调用OCR接口
+  if (imgFiles.length) {
+    statusEl.textContent = `正在OCR识别 ${imgFiles.length} 张截图...`;
+    const fd = new FormData();
+    for (const f of imgFiles) fd.append('files', f);
+    try {
+      const resp = await fetch('/api/family-parse-image', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (data.detail) { statusEl.textContent = 'OCR错误：' + data.detail; }
+      else {
+        for (const p of data.policies) {
+          if (p.error) {
+            policies.push({ filename: p.filename, product_name: 'OCR失败', category: '其他', age: null, gender: null, sum_assured: null, annual_premium: null, pay_years: null, error: p.error });
+          } else {
+            policies.push(p);
+          }
+        }
+        total += imgFiles.length;
+      }
+    } catch (e) {
+      statusEl.textContent = 'OCR失败：' + e.message;
+    }
+  }
+
+  statusEl.textContent = `已解析 ${total} 份材料（共 ${policies.length} 张保单）`;
+  fileInputPdf.value = '';
+  render();
+}
+
+// ===== 添加提取方案文件（存File对象，不解析） =====
+function addExtractFiles(files) {
+  for (const f of files) {
+    extractFiles.push({ name: f.name, size: f.size, file: f });
+  }
+  fileInputExtract.value = '';
+  statusEl.textContent = `已上传 ${extractFiles.length} 份提取方案文件`;
+  render();
+}
+
+// ===== 添加截图文件（存File对象） =====
+function addShotFiles(files) {
+  for (const f of files) {
+    shotFiles.push({ name: f.name, size: f.size, file: f });
+  }
+  fileInputShot.value = '';
+  statusEl.textContent = `已上传 ${shotFiles.length} 份财务概览文件`;
+  render();
+}
+
+// ===== 格式化 =====
+function fmtSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1048576).toFixed(1) + ' MB';
+}
+
+function catClass(cat) {
+  if (cat && cat.includes('危疾')) return 'cat-危疾';
+  if (cat && cat.includes('医疗')) return 'cat-医疗';
+  if (cat && cat.includes('储蓄')) return 'cat-储蓄';
+  if (cat && cat.includes('寿险')) return 'cat-寿险';
+  return 'cat-其他';
+}
+
+function catLabel(cat) {
+  if (!cat) return '其他';
+  if (cat.includes('储蓄')) return '储蓄';
+  if (cat.includes('危疾')) return '危疾';
+  if (cat.includes('医疗')) return '医疗';
+  if (cat.includes('寿险')) return '寿险';
+  return cat;
+}
+
+// ===== 渲染 =====
+function render() {
+  // 计划书文件列表（解析出的保单 + 图片）
+  const listPdf = document.getElementById('listPdf');
+  let html = '';
+  // 解析出的保单
+  if (policies.length) {
+    html += policies.map((p, i) => `
+      <div class="file-item">
+        <span class="file-name">${p.filename || '—'}</span>
+        <span class="file-meta">
+          <span class="cat-tag ${catClass(p.category)}">${p.category || '其他'}</span>
+          ${p.product_name ? p.product_name : ''}
+          ${p.error ? `<span class="file-error">${p.error}</span>` : ''}
+        </span>
+        <button class="file-remove" onclick="policies.splice(${i},1);render()">删除</button>
+      </div>
+    `).join('');
+  }
+  // 计划书图片
+  if (planImages.length) {
+    html += planImages.map((f, i) => `
+      <div class="file-item">
+        <span class="file-name">${f.name}</span>
+        <span class="file-meta"><span class="cat-tag" style="background:#eaf1fb;color:var(--blue);">图片</span> ${fmtSize(f.size)}</span>
+        <button class="file-remove" onclick="planImages.splice(${i},1);render()">删除</button>
+      </div>
+    `).join('');
+  }
+  listPdf.innerHTML = html;
+  dropPdf.classList.toggle('has-file', policies.length > 0 || planImages.length > 0);
+
+  // 提取方案文件列表
+  const listExtract = document.getElementById('listExtract');
+  if (extractFiles.length) {
+    listExtract.innerHTML = extractFiles.map((f, i) => `
+      <div class="file-item">
+        <span class="file-name">${f.name}</span>
+        <span class="file-meta">${fmtSize(f.size)}</span>
+        <button class="file-remove" onclick="extractFiles.splice(${i},1);render()">删除</button>
+      </div>
+    `).join('');
+    dropExtract.classList.add('has-file');
+  } else {
+    listExtract.innerHTML = '';
+    dropExtract.classList.remove('has-file');
+  }
+
+  // 截图文件列表
+  const listShot = document.getElementById('listShot');
+  if (shotFiles.length) {
+    listShot.innerHTML = shotFiles.map((f, i) => `
+      <div class="file-item">
+        <span class="file-name">${f.name}</span>
+        <span class="file-meta">${fmtSize(f.size)}</span>
+        <button class="file-remove" onclick="shotFiles.splice(${i},1);render()">删除</button>
+      </div>
+    `).join('');
+    dropShot.classList.add('has-file');
+  } else {
+    listShot.innerHTML = '';
+    dropShot.classList.remove('has-file');
+  }
+
+  // 进度
+  const total = policies.length + extractFiles.length + shotFiles.length;
+  const pct = total > 0 ? Math.min(100, (policies.length / Math.max(policies.length, 1)) * 100) : 0;
+  // 简单进度：PDF解析完就算完成
+  document.getElementById('progressFill').style.width = policies.length > 0 ? '100%' : '0%';
+
+  // 生成按钮：有任何计划书材料（PDF解析或图片）就可以生成
+  const hasPlan = policies.length > 0 || planImages.length > 0;
+  document.getElementById('btnExport').disabled = !hasPlan;
+
+  // 结果区
+  renderResult();
+}
+
+function renderResult() {
+  const area = document.getElementById('resultArea');
+  const hasPlan = policies.length > 0 || planImages.length > 0;
+  if (!hasPlan) { area.innerHTML = ''; return; }
+
+  let html = '';
+
+  // 汇总卡片
+  html += '<div class="summary-card">';
+  html += '<div style="font-size:14px;font-weight:700;margin-bottom:10px;">材料汇总</div>';
+  const planTotal = policies.length + planImages.length;
+  html += `<div class="summary-row"><span class="label">保单计划书</span><span class="value">${planTotal} 份（${policies.length}份PDF已解析 + ${planImages.length}张图片）</span></div>`;
+  html += `<div class="summary-row"><span class="label">提取方案</span><span class="value">${extractFiles.length} 份</span></div>`;
+  html += `<div class="summary-row"><span class="label">财务概览截图</span><span class="value">${shotFiles.length} 张</span></div>`;
+  html += '</div>';
+
+  // 按受保人分组
+  const groups = {};
+  policies.forEach(p => {
+    const name = p.insured_name || '未知';
+    if (!groups[name]) groups[name] = [];
+    groups[name].push(p);
+  });
+
+  // 每个受保人一张表
+  Object.keys(groups).forEach(name => {
+    const list = groups[name];
+    html += `<div style="margin-top:20px;margin-bottom:8px;font-size:15px;font-weight:700;color:var(--red);">${name} 的保单</div>`;
+    html += '<table><thead><tr>';
+    html += '<th>类型</th><th>产品</th><th>缴费编号</th><th>保额</th><th>前十年增</th><th>年缴保费</th><th>供款期</th><th>剩余缴费</th>';
+    html += '</tr></thead><tbody>';
+    list.forEach(p => {
+      const sa = p.sum_assured ? '$' + p.sum_assured.toLocaleString('en-US', {maximumFractionDigits:0}) : '—';
+      const prem = p.annual_premium ? '$' + p.annual_premium.toLocaleString('en-US', {maximumFractionDigits:1}) : '—';
+      let remain = '—';
+      if (p.remaining_pay_years !== null && p.remaining_pay_years !== undefined) {
+        remain = p.remaining_pay_years === 0 ? '缴费期满' : p.remaining_pay_years + '年';
+      }
+      html += `<tr>
+        <td><span class="cat-tag ${catClass(p.category)}">${catLabel(p.category)}</span></td>
+        <td style="text-align:left">${p.product_name || '—'}</td>
+        <td style="font-family:monospace;font-size:12px">${p.billing_number || '—'}</td>
+        <td>${sa}</td>
+        <td>${p.first_10y_bonus || '—'}</td>
+        <td>${prem}</td>
+        <td>${p.pay_years ? p.pay_years + '年' : '—'}</td>
+        <td>${remain}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+  });
+
+  area.innerHTML = html;
+}
+
+// ===== 导出检视PPT =====
+document.getElementById('btnExport').onclick = async () => {
+  statusEl.textContent = '正在生成检视PPT...';
+  try {
+    // 用FormData传文件
+    const fd = new FormData();
+    // 保单数据
+    fd.append('policies', JSON.stringify(policies));
+    // 提取方案文件（需要拿到原始File对象，不只是name/size）
+    // 之前addExtractFiles只存了name和size，现在要改成存File对象
+    // 先临时从input里拿，后面改数据结构
+    // 提取方案文件
+    for (const f of extractFiles) {
+      if (f.file) fd.append('extract_files', f.file);
+    }
+    // 财务概览文件
+    for (const f of shotFiles) {
+      if (f.file) fd.append('shot_files', f.file);
+    }
+
+    const resp = await fetch('/api/family-review-export-ppt', {
+      method: 'POST',
+      body: fd
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      statusEl.textContent = '生成失败：' + (err.detail || resp.statusText);
+      return;
+    }
+    // 下载文件
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '家庭保单检视.pptx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    statusEl.textContent = '检视PPT已生成并下载';
+  } catch (e) {
+    statusEl.textContent = '生成失败：' + e.message;
+  }
+};
+
+// ===== 清空 =====
+document.getElementById('btnClear').onclick = () => {
+  policies = [];
+  planImages = [];
+  extractFiles = [];
+  shotFiles = [];
+  statusEl.textContent = '';
+  render();
+};
+
+// 初始化
+render();
+</script>
+</body>
+</html>

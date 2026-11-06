@@ -823,17 +823,11 @@ def detect_product_family(text):
     return "UNKNOWN"
 
 
-def parse_basic_fast(pdf_path):
-    """快速解析：只提取前6页基本信息，不解析退保价值表。
+def parse_basic_from_text(text):
+    """从文本中提取保单基本信息（PDF和图片OCR共用）。
     返回 {product_code, product_name, category, age, gender, currency,
-           sum_assured, annual_premium, pay_years, total_premium, filename}
+           sum_assured, annual_premium, pay_years, total_premium, ...}
     """
-    doc = fitz.open(pdf_path)
-    # 扫描前6页（封面+空白页+摘要页通常在前6页内）
-    n = min(6, len(doc))
-    text = "\n".join(doc[i].get_text() for i in range(n))
-    doc.close()
-
     product = detect_product_family(text)
     product_name = FAMILY_PRODUCT_NAMES.get(product, product)
 
@@ -965,6 +959,210 @@ def parse_basic_fast(pdf_path):
         info["product_name"] += "（含VFPR）"
 
     return info
+
+
+def parse_policy_detail_from_text(text):
+    """解析保诚系统保单详情页HTML提取的文本。
+    和计划书PDF格式完全不同，单独一套正则。
+    """
+    info = {
+        "product_code": None,
+        "product_name": None,
+        "category": "其他",
+        "policy_number": None,
+        "billing_number": None,
+        "insured_name": None,
+        "age": None,
+        "gender": None,
+        "currency": None,
+        "sum_assured": None,
+        "annual_premium": None,
+        "pay_years": None,
+        "total_premium": None,
+        "remaining_pay_years": None,
+        "first_10y_bonus": None,
+        "status": None,
+    }
+
+    # 保单号码
+    m = re.search(r"保[單单][號号][碼码]\s*\n?\s*(\d{6,})", text)
+    if m:
+        info["policy_number"] = m.group(1)
+
+    # 缴费编号（去掉BN前缀）
+    m = re.search(r"繳費編號\s*\n?\s*BN(\d+)", text)
+    if m:
+        info["billing_number"] = m.group(1)
+
+    # 计划名称 + 产品代码：「誠保一生」危疾保險計劃 (CIM3)
+    # 格式：計劃名稱 → 换行 → 产品名 → 换行 → (CIM3)
+    m = re.search(r"計劃名[稱称][\s\S]{0,20}?([^\n(]+?)\s*\n?\s*&nbsp;\s*\(([A-Z0-9]+)\)", text)
+    if m:
+        info["product_name"] = m.group(1).strip()
+        info["product_code"] = m.group(2)
+    else:
+        # 兜底：从括号里找产品代码
+        m = re.search(r"\(([A-Z]{2,}\d*)\)", text)
+        if m:
+            info["product_code"] = m.group(1)
+            info["product_name"] = FAMILY_PRODUCT_NAMES.get(info["product_code"], info["product_code"])
+
+    # 产品分类
+    if info["product_code"]:
+        info["category"] = FAMILY_PRODUCT_CATEGORY.get(info["product_code"], "其他")
+
+    # 受保人姓名：受保人 → YAN LAURA沈如清 → 提取中文名字
+    # 先把 &nbsp; 替换成空格
+    clean_text = text.replace("&nbsp;", " ")
+    m = re.search(r"受保人\s*\n?\s*[A-Z ]*([\u4e00-\u9fff]{2,5})\s*\(", clean_text)
+    if m:
+        info["insured_name"] = m.group(1)
+
+    # 性别
+    m = re.search(r"性[別别]\s*\n?\s*(F|M)", text)
+    if m:
+        info["gender"] = "女" if m.group(1) == "F" else "男"
+
+    # 出生日期
+    birth_year, birth_month, birth_day = None, None, None
+    m = re.search(r"出生日期\s*\n?\s*(\d{2})/(\d{2})/(\d{4})", text)
+    if m:
+        birth_day, birth_month, birth_year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+    # 保单生效日期（批核日期）
+    eff_year, eff_month, eff_day = None, None, None
+    m = re.search(r"保[單单]生效日期\s*\n?\s*(\d{2})/(\d{2})/(\d{4})", text)
+    if m:
+        eff_day, eff_month, eff_year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+    # 用出生日期和保单生效日期算年龄
+    if birth_year and eff_year:
+        age = eff_year - birth_year
+        if eff_month < birth_month or (eff_month == birth_month and eff_day < birth_day):
+            age -= 1
+        info["age"] = age
+    elif birth_year:
+        # 兜底：用当前日期算
+        ref_year, ref_month = 2026, 11
+        age = ref_year - birth_year
+        if birth_month > ref_month:
+            age -= 1
+        info["age"] = age
+
+    # 保单货币
+    m = re.search(r"保[單单][貨货][幣币]\s*\n?\s*([A-Z]{3})", text)
+    if m:
+        info["currency"] = m.group(1)
+
+    # 保单状态
+    m = re.search(r"狀[況况]\s*\n?\s*([A-Z ]+)", text)
+    if m:
+        info["status"] = m.group(1).strip()
+
+    # 保单生效日期 → 算已缴年数
+    effective_year = None
+    m = re.search(r"保[單单]生效日期\s*\n?\s*\d{2}/\d{2}/(\d{4})", text)
+    if m:
+        effective_year = int(m.group(1))
+
+    # 缴费模式：ANNUAL / SINGLE
+    pay_mode = None
+    m = re.search(r"繳費模式\s*\n?\s*(\w+)", text)
+    if m:
+        pay_mode = m.group(1)
+
+    # ===== 在「保障資料」表格里提取 =====
+    # 先定位「保障資料」后面的区域
+    benefit_start = text.find("保障資料")
+    if benefit_start >= 0:
+        benefit_text = text[benefit_start:benefit_start+3000]
+    else:
+        benefit_text = text
+
+    # 供款期：在保障资料表格数据行里，状态(INFORCE/FULLY PAID UP) → 首期保费日 → 供款期
+    pay_years = None
+    m = re.search(r"(INFORCE|FULLY PAID UP)\s*\n?\s*\d{2}/\d{2}/\d{4}\s*\n?\s*(\d+)", benefit_text)
+    if m:
+        val = int(m.group(2))
+        if val <= 50:
+            pay_years = val
+    # 兜底：一次缴清
+    if not pay_years and pay_mode == "SINGLE":
+        pay_years = 1
+    info["pay_years"] = pay_years
+
+    # ===== 在「遞增保障權益選擇詳情」表格里提取 =====
+    # 这个表格里才有保障额和每期保费
+    detail_start = text.find("遞增保障權益選擇詳情")
+    if detail_start >= 0:
+        detail_text = text[detail_start:detail_start+1000]
+    else:
+        detail_text = benefit_text
+
+    # 找所有数字（带逗号的金额格式）
+    numbers = re.findall(r"([\d,]+\.\d{2})", detail_text)
+    numbers = [_to_num(n) for n in numbers if _to_num(n) and _to_num(n) > 0]
+
+    # 保障额：第一个大数字（>10000）
+    sum_assured = None
+    for n in numbers:
+        if n > 10000:
+            sum_assured = n
+            break
+    info["sum_assured"] = sum_assured
+
+    # 年缴保费：第二个数字（如果第一个是保障额，第二个就是保费）
+    annual_premium = None
+    if len(numbers) >= 2:
+        # 跳过保障额那个大数字，找后面的
+        for i, n in enumerate(numbers):
+            if sum_assured and n == sum_assured:
+                # 找下一个数字
+                if i + 1 < len(numbers):
+                    annual_premium = numbers[i + 1]
+                    break
+                else:
+                    annual_premium = numbers[i]
+                    break
+    # 兜底：在「保費資料」区域找产品名后面的保费
+    if not annual_premium and info["product_code"]:
+        premium_start = text.find("保費資料")
+        if premium_start >= 0:
+            premium_text = text[premium_start:premium_start+1000]
+            pattern = r"\(" + re.escape(info["product_code"]) + r"\)[^\d]*?([\d,]+\.\d{2})"
+            m = re.search(pattern, premium_text)
+            if m:
+                annual_premium = _to_num(m.group(1))
+    info["annual_premium"] = annual_premium
+
+    # 总保费
+    if annual_premium and pay_years:
+        info["total_premium"] = annual_premium * pay_years
+    elif annual_premium:
+        info["total_premium"] = annual_premium
+
+    # 剩余缴费年期 = 总供款期 - 已缴年数
+    if pay_years and effective_year:
+        elapsed_years = 2026 - effective_year  # 以2026年为检视时点
+        remaining = pay_years - elapsed_years
+        if remaining < 0:
+            remaining = 0
+        info["remaining_pay_years"] = remaining
+
+    return info
+
+
+def parse_basic_fast(pdf_path):
+    """快速解析：只提取前6页基本信息，不解析退保价值表。
+    返回 {product_code, product_name, category, age, gender, currency,
+           sum_assured, annual_premium, pay_years, total_premium, filename}
+    """
+    doc = fitz.open(pdf_path)
+    # 扫描前6页（封面+空白页+摘要页通常在前6页内）
+    n = min(6, len(doc))
+    text = "\n".join(doc[i].get_text() for i in range(n))
+    doc.close()
+    return parse_basic_from_text(text)
 
 
 if __name__ == "__main__":
