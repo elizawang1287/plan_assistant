@@ -635,6 +635,89 @@ async def family_export_ppt(payload: dict = None):
                 para.font.color.rgb = RED
                 para.alignment = PP_ALIGN.CENTER
 
+        # ===== 产品介绍页（每个产品一段） =====
+        PRODUCT_DESC = {
+            "PRMESP": {"title": "PRMESP 世誉财富保险计划", "func": "整付保费，多元货币（美元/港元/人民币），保证现金价值+非保证归原红利+终期分红", "use": "一次性投入一笔钱，长线增值，退休时提取作为养老金，或传承给下一代", "feature": "整付即享，无供款压力；多元货币转换自由；保证回报打底，非保证红利提升收益"},
+            "TRST": {"title": "TRST 信守明天多元货币保险计划", "func": "5年缴，多元货币，保证现金价值高+非保证红利，支持灵活提取", "use": "中期储蓄（5年供款），退休前开始每年提取一笔补充收入，剩余继续滚存传承", "feature": "保证现金价值高，回本快；提取灵活，可按需调整；多元货币分散汇率风险"},
+            "PHOR": {"title": "PHOR 诚誉财富保险计划", "func": "2年缴，多元货币，短期投入长期回报，保证+非保证红利", "use": "短期资金（2年缴）做长线储蓄，适合手头有一笔钱想快速完成储蓄目标", "feature": "2年即缴清，快速完成供款；长期滚存复利效应明显；适合高净值客户资产配置"},
+            "PACE": {"title": "PACE 骏誉财富保险计划", "func": "3年缴，5列退保价值表（保证金额A+归原红利B+特别红利C+总额），多元货币", "use": "3年缴储蓄，平衡供款压力和长期回报，可提取作为退休补充收入", "feature": "3年缴清，时间适中；保证+归原红利+特别红利三重收益；提取灵活"},
+            "LFRE2": {"title": "LFRE2 自主未来II", "func": "定期寿险+储蓄成分，供款期满后有现金价值", "use": "既有寿险保障，又有储蓄积累，适合想兼顾保障和理财的客户", "feature": "保障与储蓄一体；供款期满后现金价值持续增长"},
+            "PLP2": {"title": "PLP2 美好人寿II", "func": "终身寿险，含储蓄成分，身故赔付+现金价值", "use": "终身保障+财富传承，适合留给家人一笔确定的资产", "feature": "终身保障；现金价值可贷款；传承资产确定性高"},
+            "CIM3": {"title": "CIM3 诚保一生危疾保险计划", "func": "终身危疾保障，覆盖多种严重疾病，含首次重疾、多次赔付、严重脑退化及帕金森年金", "use": "确诊危疾时一次性赔付，弥补收入损失、康复费用及高端医疗自付额", "feature": "终身保障；多次赔付；含保费豁免；有现金价值（具备储蓄成分）"},
+            "CIE3": {"title": "CIE3 守护健康危疾加护保III", "func": "终身危疾保障，覆盖74种病况，含早期危疾、深切治疗、保费豁免", "use": "确诊危疾时一次性赔付，弥补收入损失、康复费用", "feature": "终身保障；覆盖病况广；含早期危疾保障"},
+            "CIP2": {"title": "CIP2 危疾首护保险计划II", "func": "终身危疾保障，覆盖74种病况；首10年额外定期危疾保障；含早期危疾、深切治疗、保费豁免", "use": "确诊危疾时一次性赔付，弥补收入损失、康复费用及高端医疗自付额", "feature": "20年供款终身保障；有现金价值及终期红利（第3年起）；具备储蓄成分"},
+            "CIT2": {"title": "CIT2 守护健康危疾定期保II", "func": "定期危疾保障，保障期长（至指定年龄），纯保障无储蓄成分", "use": "人生责任最重的阶段（房贷期、子女教育期）用低保费撬动高保额", "feature": "保费低、保额高；定期保障，到期无现金价值；适合预算有限但需要高保额的客户"},
+            "CIT": {"title": "CIT 定期危疾保险计划", "func": "定期危疾保障，纯保障无储蓄成分", "use": "特定阶段高保额危疾保障，补充终身危疾的保额不足", "feature": "保费低、保额高；定期保障；灵活选择保障年期"},
+            "MCVIP": {"title": "MCVIP 高端医疗", "func": "终身高端医疗保障，覆盖住院及手术费用，自付额内地$1,250/境外$3,750", "use": "实报实销大额医疗开支，避免疾病导致的财务冲击", "feature": "终身续保；全球保障；高端私立医院直付"},
+            "VIP": {"title": "VIP 自愿医保尚宾", "func": "自愿医保（标准计划），住院及手术费用实报实销", "use": "基础住院医疗保障，报销公立/私家医院大额医疗费用", "feature": "自愿医保扣税；保证续保；灵活选择自付额"},
+            "CPER": {"title": "CPER 特选危疾治疗保", "func": "危疾治疗费用报销，覆盖指定疾病的治疗开支", "use": "补充危疾险，实报实销高端治疗费用（如靶向药、质子治疗等）", "feature": "实报实销；覆盖高端治疗；与危疾险互补"},
+            "ENCASH": {"title": "ENCASH 加护一生住院现金储蓄保险", "func": "住院每日现金赔付+储蓄成分，人寿保障", "use": "住院时每天领取现金，弥补住院期间的收入损失和额外开支", "feature": "住院即赔；有现金价值；储蓄与保障一体"},
+            "PLT1": {"title": "PLT1 守护家人定期寿险（1年续保）", "func": "1年续保定期寿险，纯身故/末期疾病保障，无储蓄成分", "use": "家庭经济支柱身故时，提供现金赔付给家人，覆盖房贷、子女教育、生活开支", "feature": "每年续保，保费随年龄递增；保费低、保额高；无储蓄成分"},
+            "PLT5": {"title": "PLT5 守护家人定期寿险（5年续保）", "func": "5年续保定期寿险，纯身故/末期疾病保障，无储蓄成分", "use": "家庭经济支柱身故时，提供现金赔付给家人，覆盖房贷、子女教育、生活开支", "feature": "每5年续保保费递增；保费低、保额高；无储蓄成分"},
+            "PLT10": {"title": "PLT10 守护家人定期寿险（10年续保）", "func": "10年续保定期寿险，纯身故/末期疾病保障，无储蓄成分", "use": "家庭经济支柱身故时，提供现金赔付给家人，覆盖房贷、子女教育、生活开支", "feature": "每10年续保保费递增；保费低、保额高；无储蓄成分"},
+            "PLT20": {"title": "PLT20 守护家人定期寿险（20年续保）", "func": "20年续保定期寿险，纯身故/末期疾病保障，无储蓄成分", "use": "家庭经济支柱身故时，提供现金赔付给家人，覆盖房贷、子女教育、生活开支", "feature": "每20年续保保费递增；保费低、保额高；无储蓄成分"},
+            "PLT": {"title": "PLT 定期寿险", "func": "定期寿险，纯身故保障，无储蓄成分", "use": "家庭经济支柱身故时，提供现金赔付给家人", "feature": "保费低、保额高；无储蓄成分"},
+        }
+
+        # 去重产品代码
+        seen_codes = set()
+        for pol in policies:
+            code = pol.get("product_code")
+            if not code or code in seen_codes:
+                continue
+            seen_codes.add(code)
+            desc = PRODUCT_DESC.get(code)
+            if not desc:
+                continue
+
+            # 每2个产品一页
+            if len(seen_codes) % 2 == 1:
+                slide = prs.slides.add_slide(prs.slide_layouts[6])
+                txBox = slide.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(12), Inches(0.6))
+                p = txBox.text_frame.paragraphs[0]
+                p.text = "产品介绍"
+                p.font.size = Pt(24)
+                p.font.bold = True
+                p.font.color.rgb = RED
+                y_offset = 1.2
+
+            # 动态填充本保单信息
+            sa = pol.get("sum_assured")
+            prem = pol.get("annual_premium")
+            pay_y = pol.get("pay_years")
+            sa_str = f"保额 ${sa:,.0f}" if sa else "保额 —"
+            prem_str = f"年缴 ${prem:,.0f}" if prem else "年缴 —"
+            pay_str = f"{pay_y}年供款" if pay_y else "供款期 —"
+
+            # 产品介绍文本框
+            txBox = slide.shapes.add_textbox(Inches(0.8), Inches(y_offset), Inches(11.5), Inches(2.5))
+            tf = txBox.text_frame
+            tf.word_wrap = True
+            p1 = tf.paragraphs[0]
+            p1.text = desc["title"]
+            p1.font.size = Pt(16)
+            p1.font.bold = True
+            p1.font.color.rgb = RED
+            p2 = tf.add_paragraph()
+            p2.text = f"• 功能：{desc['func']}"
+            p2.font.size = Pt(11)
+            p2.font.color.rgb = DARK
+            p3 = tf.add_paragraph()
+            p3.text = f"• 用途：{desc['use']}"
+            p3.font.size = Pt(11)
+            p3.font.color.rgb = DARK
+            p4 = tf.add_paragraph()
+            p4.text = f"• 特点：{desc['feature']}"
+            p4.font.size = Pt(11)
+            p4.font.color.rgb = DARK
+            p5 = tf.add_paragraph()
+            p5.text = f"• 本保单：{sa_str}，{prem_str}，{pay_str}"
+            p5.font.size = Pt(11)
+            p5.font.bold = True
+            p5.font.color.rgb = DARK
+
+            y_offset += 2.8
+
         buf = io.BytesIO()
         prs.save(buf)
         buf.seek(0)
