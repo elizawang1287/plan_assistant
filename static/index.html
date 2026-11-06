@@ -422,9 +422,7 @@ function render(data, fname){
     const kHtml = keyRows.map(r =>
       `<tr><td>第${r.year}年${r.year===wall.year?(`（${r.age}岁）`):''}</td>
         <td>${wU(r.surrender)}</td>
-        <td>${fmtW(r.surrender)}</td>
-        <td>${pctStr(r.simple_pct)}</td>
-        <td>${pctStr(r.compound_pct)}</td></tr>`).join('');
+        <td>${fmtW(r.surrender)}</td></tr>`).join('');
     return `
     <div class="sec">
       <div class="sec-title">建议提取方案${label?`（${label}）`:''}</div>
@@ -434,7 +432,7 @@ function render(data, fname){
       <div class="divider"></div>
       <div class="w-big">提取后账户剩余的总现金价值</div>
       <table class="w-table" style="margin-top:10px;">
-        <tr><th>保单年度</th><th>${vcur}（剩余价值）</th><th>${curLabel}（约）</th><th>单利%/年</th><th>复利%/年</th></tr>
+        <tr><th>保单年度</th><th>${vcur}（剩余价值）</th><th>${curLabel}（约）</th></tr>
         ${kHtml}
       </table>
       <div class="narr" style="margin-top:10px;">
