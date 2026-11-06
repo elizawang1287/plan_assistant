@@ -156,6 +156,38 @@ async def family_parse(files: List[UploadFile] = File(...)):
     return JSONResponse({"policies": results})
 
 
+@app.post("/api/family-detail")
+async def family_detail(files: List[UploadFile] = File(...)):
+    """完整解析PDF，返回退保价值表数据（用于详细方案对比）。"""
+    results = []
+    for file in files:
+        if not file.filename.lower().endswith(".pdf"):
+            results.append({"filename": file.filename, "error": "非PDF文件"})
+            continue
+        data = await file.read()
+        if not data:
+            results.append({"filename": file.filename, "error": "空文件"})
+            continue
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                tmp.write(data)
+                tmp_path = tmp.name
+            full = parser.parse_pdf(tmp_path)
+            os.unlink(tmp_path)
+            # 只返回前端需要的数据
+            results.append({
+                "filename": file.filename,
+                "product_code": full.get("product_code"),
+                "product_name": full.get("product_name"),
+                "basic": full.get("basic", {}),
+                "rows": full.get("rows", []),  # 退保价值表
+                "optimistic": full.get("optimistic", {}),
+            })
+        except Exception as e:
+            results.append({"filename": file.filename, "error": f"解析失败：{e}"})
+    return JSONResponse({"policies": results})
+
+
 # OCR 懒加载（首次调用时才初始化，避免启动慢）
 _ocr_reader = None
 
