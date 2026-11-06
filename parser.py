@@ -624,7 +624,12 @@ def parse_withdrawal(text, anb_age, product):
     if start_idx is None:
         return None
 
-    n_cols = 7 if product in ("TRST", "PACE") else 8
+    if product in ("TRST", "PACE"):
+        n_cols = 7
+    elif product == "PHOR":
+        n_cols = 6
+    else:
+        n_cols = 8
     rows = []
     i = start_idx
     n = len(lines)
@@ -651,6 +656,9 @@ def parse_withdrawal(text, anb_age, product):
                 age = (anb_age + year) if anb_age else None
                 if product in ("TRST", "PACE"):
                     withdrawal, surrender = vals[1], vals[5]
+                elif product == "PHOR":
+                    # PHOR 6列：保费, 名义金额, 红利B, 保证A, 退保总额, 当年提取
+                    withdrawal, surrender = vals[5], vals[4]
                 else:
                     withdrawal, surrender = vals[-1], vals[5]
                 rows.append({"year": year,
