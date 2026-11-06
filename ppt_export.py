@@ -277,9 +277,13 @@ def add_base_slides(prs, blank, data, rate=6.8):
     _box(slide, f"{age}岁 {b.get('gender','')}".strip() + (f"（{b.get('smoker')}）" if b.get('smoker') else "") + f"｜保单货币：{cur}", 0.71, 1.14, 6.85, size=12, color=GRAY, align=PP_ALIGN.CENTER)
     _add_line(slide, 0.52, 1.54, 7.08)
     _box(slide, "退保价值", 0.52, 1.60, 7.22, size=20, bold=True, color=DARK, align=PP_ALIGN.CENTER)
-    normal_rows = [[ylab(r), _wan(r["surrender"]), _rmb(r["surrender"], rate)] for r in rows]
-    _build_table(slide, 2.05, [["保单年度", cur, f"{cl}（约）"]], normal_rows,
-                 col_w=[2.62, 2.3, 2.3], row_h=0.42, hdr_size=24, data_size=18, red_cols=[2],
+    normal_rows = []
+    for r in rows:
+        s = f"{r['simple_pct']}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
+        c = f"{r['compound_pct']}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
+        normal_rows.append([ylab(r), _wan(r["surrender"]), _rmb(r["surrender"], rate), s, c])
+    _build_table(slide, 2.05, [["保单年度", cur, f"{cl}（约）", "单利%/年", "复利%/年"]], normal_rows,
+                 col_w=[1.6, 1.8, 1.6, 1.1, 1.1], row_h=0.42, hdr_size=18, data_size=14, red_cols=[2],
                  be_index=be_index)
     _box(slide, "剩余资金可一次性取出，或传承给下一代", 0.52, 10.95, 7.22, size=16, color=RED, align=PP_ALIGN.CENTER)
     _footer(slide, rate, cl, be_note)
