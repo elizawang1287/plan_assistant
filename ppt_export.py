@@ -297,9 +297,13 @@ def add_base_slides(prs, blank, data, rate=6.8):
         slide = prs.slides.add_slide(blank)
         _box(slide, "退保价值", 3.43, 0.20, 1.44, size=22, bold=True, color=DARK, align=PP_ALIGN.CENTER)
         _box(slide, "（投资回报比现时预期每年上升约 1.4%）", 0.52, 0.72, 7.22, size=16, color=DARK, align=PP_ALIGN.CENTER)
-        opt_rows = [[ylab(r), _wan(opt_of(r)), _rmb(opt_of(r), rate)] for r in rows]
-        _build_table(slide, 1.14, [["保单年度", cur, f"{cl}（约）"]], opt_rows,
-                     col_w=[2.62, 2.3, 2.3], row_h=0.45, hdr_size=24, data_size=18, red_cols=[2],
+        opt_rows = []
+        for r in rows:
+            s = f"{r['simple_pct']}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
+            c = f"{r['compound_pct']}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
+            opt_rows.append([ylab(r), _wan(opt_of(r)), _rmb(opt_of(r), rate), s, c])
+        _build_table(slide, 1.14, [["保单年度", cur, f"{cl}（约）", "单利%/年", "复利%/年"]], opt_rows,
+                     col_w=[1.6, 1.8, 1.6, 1.1, 1.1], row_h=0.45, hdr_size=18, data_size=14, red_cols=[2],
                      be_index=be_index)
         _box(slide, "长远受每年 6.5% 客户总内部回报率规限，乐观与正常情景趋于一致",
              0.52, 11.0, 7.22, size=16, color=RED, align=PP_ALIGN.CENTER)
