@@ -608,7 +608,7 @@ def parse_encash(text, basic):
     return {"basic_extra": basic_extra, "rows": rows, "product_advantage": product_advantage}
 
 
-def parse_withdrawal(text, anb_age, product):
+def parse_withdrawal(text, anb_age, product, total_premium=None, annual_premium=None, pay_years=None):
     """
     解析「現金價值提取下退保價值」表（即有提取安排的计划书）。
     TRST 每行 7 个数字：[已缴保费, 当年提取, 保证A, 归原红利B, 终期红利C, 退保总额, 名义金额]
@@ -675,6 +675,11 @@ def parse_withdrawal(text, anb_age, product):
     for r in rows:
         acc += r["withdrawal"]
         r["accumulated"] = acc
+        # 加单利复利（基于提取后剩余退保价值）
+        if total_premium:
+            r2 = compute_metrics(r, total_premium, annual_premium, pay_years)
+            r["simple_pct"] = r2.get("simple_pct")
+            r["compound_pct"] = r2.get("compound_pct")
     start_year = next((r["year"] for r in rows if r["withdrawal"] > 0), None)
     annual = next((r["withdrawal"] for r in rows if r["withdrawal"] > 0), 0)
     return {"rows": rows, "start_year": start_year, "annual_withdrawal": annual}
@@ -751,7 +756,9 @@ def parse_pdf(pdf_path):
                                      basic.get("total_premium"), product=product)
         rows = [compute_metrics(r, basic.get("total_premium"),
                                 basic.get("annual_premium"), basic.get("pay_years")) for r in rows]
-        withdrawal = parse_withdrawal(text, basic.get("anb_age"), product)
+        withdrawal = parse_withdrawal(text, basic.get("anb_age"), product,
+                                      basic.get("total_premium"), basic.get("annual_premium"),
+                                      basic.get("pay_years"))
         optimistic = parse_optimistic(text, basic.get("anb_age"))
         product_advantage = None
     return {
