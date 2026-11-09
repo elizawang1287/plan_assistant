@@ -916,8 +916,8 @@ def parse_basic_from_text(text):
     # 纯储蓄险产品（保额不适用）：PRMESP
     # TRST/PHOR/PACE等储蓄险也从PDF提取总保费作为"总保额"显示
     savings_no_sum = {"PRMESP"}
-    # 定期寿险产品（PLT系列）：表格布局特殊，需单独提取保额
-    term_life_products = {"PLT1", "PLT5", "PLT10", "PLT20", "PLT"}
+    # 定期寿险/终身寿险产品（PLT系列 + PLP2）：表格布局特殊，需单独提取保额
+    term_life_products = {"PLT1", "PLT5", "PLT10", "PLT20", "PLT", "PLP2"}
     if product in savings_no_sum:
         sum_assured = None
     elif product in term_life_products:
