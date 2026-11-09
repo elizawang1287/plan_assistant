@@ -264,6 +264,38 @@ function fmtPremHkdCell(v) {
   return sym + Math.round(cv).toLocaleString();
 }
 // 总保费 = 年缴 × 供款期（储蓄类无「保额」，统一用总保费口径）
+// 根据产品类型显示正确的总保额/总投入
+function fmtTotalCell(p) {
+  const cat = p.category || '';
+  if (cat.includes('危疾') || cat.includes('寿险')) {
+    // 重疾/寿险：显示固定保额
+    return fmtSumCell(p.sum_assured);
+  } else if (cat.includes('医疗')) {
+    // 医疗类：空
+    return '—';
+  } else {
+    // 储蓄类：显示总投入（年缴×供款期）
+    return fmtSumCell(totalPremiumOf(p));
+  }
+}
+function fmtTotalHkdCell(p) {
+  const cat = p.category || '';
+  if (cat.includes('危疾') || cat.includes('寿险')) {
+    return fmtSumHkdCell(p.sum_assured);
+  } else if (cat.includes('医疗')) {
+    return '—';
+  } else {
+    return fmtSumHkdCell(totalPremiumOf(p));
+  }
+}
+// 根据产品类型返回列名
+function totalColLabel(p) {
+  const cat = p.category || '';
+  if (cat.includes('危疾') || cat.includes('寿险')) return '总保额';
+  if (cat.includes('医疗')) return '总保额';
+  return '总投入';
+}
+
 function totalPremiumOf(p) {
   const ap = parseFloat(p.annual_premium) || 0;
   const py = parseInt(p.pay_years) || 0;
@@ -646,13 +678,17 @@ function render() {
     html += `<div style="background:#fff;border-radius:10px;padding:16px;margin-bottom:16px;border:1px solid var(--line)">`;
     html += `<div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--pr)">${cat}</div>`;
 
-    // 表格：家庭成员 | 产品 | 总保额(USD) | 总保额(换算) | 前十年赠送 | 年保费(USD) | 年保费(换算) | 供款期
+    // 表格：家庭成员 | 产品 | 总保额/总投入(USD) | 换算 | 前十年赠送 | 年保费(USD) | 年保费(换算) | 供款期
     const { label: currLabel } = getCurr();
+    // 根据类型决定列名
+    const isCriticalOrLife = ['危疾', '寿险'].some(k => cat.includes(k));
+    const isMedical = cat.includes('医疗');
+    const totalColName = isCriticalOrLife ? '总保额(USD)' : (isMedical ? '年保费(USD)' : '总投入(USD)');
     html += '<table style="font-size:12px"><thead><tr>';
     html += '<th style="text-align:left;width:110px">家庭成员</th>';
     html += '<th style="text-align:left">产品</th>';
-    html += '<th>总保额(USD)</th>';
-    html += `<th>总保额(${currLabel})</th>`;
+    html += `<th>${totalColName}</th>`;
+    html += `<th>${totalColName.replace('(USD)', `(${currLabel})`)}</th>`;
     html += '<th>前十年赠送</th>';
     html += '<th>年保费(USD)</th>';
     html += `<th>年保费(${currLabel})</th>`;
@@ -673,8 +709,8 @@ function render() {
           html += `<td rowspan="${personPols.length}" style="font-weight:700;text-align:left;background:#f8f9fa;vertical-align:middle">${person}</td>`;
         }
         html += `<td style="text-align:left">${pol.product_name||'—'}</td>`;
-        html += `<td style="white-space:nowrap">${fmtSumCell(totalPremiumOf(pol))}</td>`;
-        html += `<td style="white-space:nowrap">${fmtSumHkdCell(totalPremiumOf(pol))}</td>`;
+        html += `<td style="white-space:nowrap">${fmtTotalCell(pol)}</td>`;
+        html += `<td style="white-space:nowrap">${fmtTotalHkdCell(pol)}</td>`;
         // 前十年赠送保额：暂留空，可手填
         html += `<td style="white-space:nowrap">${pol.first_10y_bonus ? fmtSumCell(pol.first_10y_bonus) : '—'}</td>`;
         html += `<td style="white-space:nowrap">${fmtPremCell(pol.annual_premium)}</td>`;
@@ -701,16 +737,15 @@ function render() {
   });
   html += '<table style="margin-top:8px"><thead><tr>';
   const { label: currLabel2 } = getCurr();
-  html += `<th>家庭成员</th><th>产品</th><th>总保额(USD)</th><th>总保额(${currLabel2})</th><th>前十年赠送</th><th>年保费(USD)</th><th>年保费(${currLabel2})</th><th>供款期</th>`;
+  html += `<th>家庭成员</th><th>产品</th><th>总保额/总投入(USD)</th><th>总保额/总投入(${currLabel2})</th><th>前十年赠送</th><th>年保费(USD)</th><th>年保费(${currLabel2})</th><th>供款期</th>`;
   html += '</tr></thead><tbody>';
   let grandTotalUsd = 0;
   personOrder.forEach(person => {
     const pols = personPolicies[person];
     pols.forEach((p, idx) => {
       grandTotalUsd += p.annual_premium || 0;
-      const tp = totalPremiumOf(p);
-      const sa = fmtSumCell(tp);
-      const saHkd = fmtSumHkdCell(tp);
+      const sa = fmtTotalCell(p);
+      const saHkd = fmtTotalHkdCell(p);
       html += `<tr>
         <td style="font-weight:700">${idx===0 ? person : ''}</td>
         <td class="left">${p.product_name}</td>
@@ -718,16 +753,18 @@ function render() {
         <td class="num">${saHkd}</td>
         <td class="num">${p.first_10y_bonus ? fmtSumCell(p.first_10y_bonus) : '—'}</td>
         <td class="num">${fmt(p.annual_premium)}</td>
-        <td class="num">HK$${Math.round((p.annual_premium||0)*(parseFloat(rateHkd.value)||7.8)).toLocaleString()}</td>
+        <td class="num">${fmtCurr(p.annual_premium)}</td>
         <td class="num">${p.pay_years ? p.pay_years+'年' : '—'}</td>
       </tr>`;
     });
   });
-  const grandHkd = grandTotalUsd * (parseFloat(rateHkd.value)||7.8);
+  const { rate: grandRate } = getCurr();
+  const grandCurr = grandTotalUsd * grandRate;
+  const grandLabel = getCurr().label;
   html += `<tr style="background:#FDECEC;font-weight:700;color:var(--pr)">
     <td>年缴合计</td><td></td><td></td><td></td><td></td>
     <td class="num">${fmt(grandTotalUsd)}</td>
-    <td class="num">HK$${Math.round(grandHkd).toLocaleString()}</td>
+    <td class="num">${grandLabel}${Math.round(grandCurr).toLocaleString()}</td>
     <td></td>
   </tr>`;
   html += '</tbody></table>';
