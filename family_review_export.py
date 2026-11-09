@@ -312,6 +312,65 @@ def _product_keywords(policy):
     return kws
 
 
+def _shot_clip_rect(page):
+    """财务概览页裁剪区域：去掉顶部日期/保单号标题行、左侧导航栏、底部备注与页脚，只留主体表格。
+    这个 PDF 的表格线是细矩形不是线对象，所以用文本块定位：
+    - 上边界：'保單號碼' 所在行
+    - 下边界：最后一行的 '已繳總保費'（含金额，排除下方以 * 开头的注释）
+    - 左右：该区域内 x>105 的内容范围（105 以左是导航栏）
+    """
+    rect = page.rect
+    blocks = page.get_text('blocks')
+
+    top_y = None
+    for kw in ('保單號碼', '保单号码'):
+        hits = page.search_for(kw)
+        if hits:
+            top_y = hits[0].y0 - 4
+            break
+    if top_y is None:
+        top_y = rect.height * 0.095
+
+    bottom_y = None
+    for b in blocks:
+        txt = b[4].replace('\xa0', ' ').strip()
+        if txt.startswith('已繳總保費') or txt.startswith('已繳費保費') or txt.startswith('已缴总保费'):
+            if b[3] > top_y:
+                bottom_y = max(bottom_y or 0, b[3])
+    if bottom_y is None:
+        inner = [b for b in blocks if b[1] > top_y and b[3] < rect.height * 0.9]
+        bottom_y = max((b[3] for b in inner), default=rect.height * 0.7)
+    bottom_y += 8
+
+    inner = [b for b in blocks if b[1] >= top_y - 2 and b[3] <= bottom_y and b[0] > 105]
+    if inner:
+        left_x = min(b[0] for b in inner) - 4
+        right_x = max(b[2] for b in inner) + 4
+    else:
+        left_x, right_x = 108.0, rect.width - 18
+
+    return (max(rect.x0, left_x), max(rect.y0, top_y), min(rect.x1, right_x), min(rect.y1, bottom_y))
+
+
+def _shot_pdf_to_image(path):
+    """财务概览 PDF 只取第 1 页，并按主体表格区域裁剪。"""
+    import fitz
+    from PIL import Image
+    doc = fitz.open(path)
+    try:
+        if len(doc) == 0:
+            return None
+        page = doc[0]
+        clip = _shot_clip_rect(page)
+        if clip and clip[3] - clip[1] > 50 and clip[2] - clip[0] > 100:
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), clip=fitz.Rect(*clip))
+        else:
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+        return Image.open(io.BytesIO(pix.tobytes('png')))
+    finally:
+        doc.close()
+
+
 def _build_shot_candidates(shot_paths):
     """把财务概览文件逐一转成候选：{path, text, image, used}。
     关键：每个文件单独配对一张图，不用全局图片列表下标，避免 PDF 多页时错位。
@@ -328,8 +387,7 @@ def _build_shot_candidates(shot_paths):
                 doc = fitz.open(path)
                 text = doc[0].get_text() if len(doc) > 0 else ""
                 doc.close()
-                imgs = _pdf_to_images(path)
-                image = imgs[0] if imgs else None
+                image = _shot_pdf_to_image(path)
             elif ext in ('.png', '.jpg', '.jpeg', '.gif', '.bmp'):
                 from PIL import Image
                 image = Image.open(path)
