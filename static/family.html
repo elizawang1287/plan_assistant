@@ -189,9 +189,10 @@ async function uploadFiles(files) {
     }
     rateBar.style.display = 'flex';
     toolbar.style.display = 'flex';
-    // 详细模式存detailData
+    // 详细模式存detailData（累加，和policies保持同步）
     if (mode === 'detail') {
-      window._detailData = data.policies;
+      if (!window._detailData) window._detailData = [];
+      window._detailData = window._detailData.concat(data.policies);
     }
     render();
     statusEl.textContent = `已解析 ${policies.length} 张保单（${mode === 'detail' ? '详细模式' : '简单模式'}）`;
@@ -869,6 +870,7 @@ document.getElementById('btnExportImg').onclick = async () => {
 
 document.getElementById('btnClear').onclick = () => {
   policies = [];
+  window._detailData = null;
   render();
   rateBar.style.display = 'none';
   toolbar.style.display = 'none';
