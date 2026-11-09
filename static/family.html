@@ -98,12 +98,29 @@
     <input type="file" id="fileInput" multiple accept=".pdf" style="display:none">
   </div>
 
-  <div class="rate-bar" id="rateBar" style="display:none">
-    <label>USD → HKD</label>
-    <input type="number" id="rateHkd" value="7.8" step="0.01">
-    <label>USD → RMB</label>
-    <input type="number" id="rateRmb" value="7.2" step="0.01">
+  <div class="rate-bar" id="rateBar" style="display:none;align-items:center;gap:12px">
+    <label style="display:flex;align-items:center;gap:4px;cursor-pointer">
+      <input type="radio" name="curr" value="hkd" checked style="accent-color:var(--pr)" onchange="switchCurr()">
+      <span style="font-size:13px;font-weight:600">HKD</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:4px;cursor-pointer">
+      <input type="radio" name="curr" value="rmb" style="accent-color:var(--pr)" onchange="switchCurr()">
+      <span style="font-size:13px;font-weight:600">RMB</span>
+    </label>
+    <label style="font-size:13px">汇率：</label>
+    <input type="number" id="rateHkd" value="7.8" step="0.01" style="width:70px" oninput="render()">
+    <input type="number" id="rateRmb" value="7.2" step="0.01" style="width:70px;display:none" oninput="render()">
   </div>
+
+<script>
+function switchCurr() {
+  const sel = document.querySelector('input[name="curr"]:checked');
+  const isHkd = !sel || sel.value === 'hkd';
+  document.getElementById('rateHkd').style.display = isHkd ? '' : 'none';
+  document.getElementById('rateRmb').style.display = isHkd ? 'none' : '';
+  render();
+}
+</script>
 
   <div class="toolbar" id="toolbar" style="display:none">
     <button class="btn btn-primary" id="btnExport">导出 PPT</button>
@@ -191,8 +208,28 @@ async function uploadFiles(files) {
 }
 
 function fmt(v) { return v == null ? '—' : '$' + Number(v).toLocaleString('en-US', {maximumFractionDigits: 0}); }
-function fmtHkd(v) { if (v == null) return '—'; const r = parseFloat(rateHkd.value)||7.8; return 'HK$' + Math.round(v*r).toLocaleString(); }
-function fmtRmb(v) { if (v == null) return '—'; const r = parseFloat(rateRmb.value)||7.2; return '¥' + Math.round(v*r).toLocaleString(); }
+
+// 获取当前选择的货币和汇率
+function getCurr() {
+  const sel = document.querySelector('input[name="curr"]:checked');
+  const isHkd = !sel || sel.value === 'hkd';
+  const rate = isHkd ? (parseFloat(rateHkd.value)||7.8) : (parseFloat(rateRmb.value)||7.2);
+  const label = isHkd ? 'HKD' : 'RMB';
+  return { isHkd, rate, label };
+}
+function fmtCurr(v) {
+  if (v == null) return '—';
+  const { isHkd, rate, label } = getCurr();
+  const sym = isHkd ? 'HK$' : '¥';
+  return sym + Math.round(v*rate).toLocaleString();
+}
+function fmtCurrWan(v) {
+  if (v == null) return '—';
+  const { isHkd, rate, label } = getCurr();
+  const sym = isHkd ? 'HKD' : '¥';
+  const w = v*rate/10000;
+  return sym + (w >= 100 ? w.toFixed(0) : w.toFixed(1)) + '万';
+}
 
 // 万为单位：475000 → 47.5万
 function fmtWan(v) {
@@ -208,19 +245,23 @@ function fmtSumCell(v) {
 // HKD保额：HKD 373万
 function fmtSumHkdCell(v) {
   if (v == null) return '—';
-  const hkd = v * (parseFloat(rateHkd.value)||7.8);
-  return 'HKD ' + fmtWan(hkd);
+  const { isHkd, rate, label } = getCurr();
+  const cv = v * rate;
+  const sym = isHkd ? 'HKD' : 'RMB';
+  return sym + ' ' + fmtWan(cv);
 }
 // 年缴单元格：$17,922.5
 function fmtPremCell(v) {
   if (v == null) return '—';
   return '$' + v.toLocaleString('en-US', {maximumFractionDigits: 1});
 }
-// HKD年缴：HK$140,871
+// 换算年缴
 function fmtPremHkdCell(v) {
   if (v == null) return '—';
-  const hkd = v * (parseFloat(rateHkd.value)||7.8);
-  return 'HK$' + Math.round(hkd).toLocaleString();
+  const { isHkd, rate } = getCurr();
+  const cv = v * rate;
+  const sym = isHkd ? 'HK$' : '¥';
+  return sym + Math.round(cv).toLocaleString();
 }
 
 function catClass(cat) {
@@ -408,6 +449,7 @@ function render() {
     });
     html += '<table style="font-size:11px;border-collapse:collapse;width:100%"><thead>';
     // 第一行表头
+    const { label: currLabel3 } = getCurr();
     html += '<tr>';
     html += '<th rowspan="2" style="border:1px solid #ccc;padding:8px 6px;background:var(--pr);color:#fff;font-weight:700">保单年度</th>';
     prodLabels.forEach(label => {
@@ -418,18 +460,18 @@ function render() {
     html += '<tr>';
     detailData.forEach(p => {
       html += '<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">USD</th>';
-      html += '<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">RMB</th>';
+      html += `<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">${currLabel3}</th>`;
     });
     html += '</tr></thead><tbody>';
-    const rRmb = parseFloat(rateRmb.value)||7.2;
+    const { rate: currRate } = getCurr();
     years.forEach(y => {
       html += `<tr><td style="font-weight:700;border:1px solid #ccc;padding:6px;text-align:center">第${y}年</td>`;
       detailData.forEach(p => {
         const row = (p.rows||[]).find(r => r.year === y);
         const sv = row ? row.surrender : null;
         const svStr = sv ? (sv/10000).toFixed(1) + '万' : '—';
-        const svRmbStr = sv ? (sv*rRmb/10000).toFixed(1) + '万' : '—';
-        html += `<td style="white-space:nowrap;border:1px solid #ccc;padding:6px;text-align:center">${svStr}</td><td style="white-space:nowrap;border:1px solid #ccc;padding:6px;text-align:center;color:var(--pr)">${svRmbStr}</td>`;
+        const svCurrStr = sv ? (sv*currRate/10000).toFixed(1) + '万' : '—';
+        html += `<td style="white-space:nowrap;border:1px solid #ccc;padding:6px;text-align:center">${svStr}</td><td style="white-space:nowrap;border:1px solid #ccc;padding:6px;text-align:center;color:var(--pr)">${svCurrStr}</td>`;
       });
       html += '</tr>';
     });
@@ -530,14 +572,15 @@ function render() {
     html += `<div style="background:#fff;border-radius:10px;padding:16px;margin-bottom:16px;border:1px solid var(--line)">`;
     html += `<div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--pr)">${cat}</div>`;
 
-    // 表格：家庭成员 | 产品 | 总保额(USD) | 总保额(HKD) | 年保费(USD) | 年保费(HKD) | 供款期 | 最后剩余价值
+    // 表格：家庭成员 | 产品 | 总保额(USD) | 总保额(换算) | 年保费(USD) | 年保费(换算) | 供款期 | 最后剩余价值
+    const { label: currLabel } = getCurr();
     html += '<table style="font-size:12px"><thead><tr>';
     html += '<th style="text-align:left;width:110px">家庭成员</th>';
     html += '<th style="text-align:left">产品</th>';
     html += '<th>总保额(USD)</th>';
-    html += '<th>总保额(HKD)</th>';
+    html += `<th>总保额(${currLabel})</th>`;
     html += '<th>年保费(USD)</th>';
-    html += '<th>年保费(HKD)</th>';
+    html += `<th>年保费(${currLabel})</th>`;
     html += '<th style="width:60px">供款期</th>';
     html += '<th>最后剩余价值(USD)</th>';
     html += '</tr></thead><tbody>';
@@ -584,7 +627,8 @@ function render() {
     personPolicies[key].push(p);
   });
   html += '<table style="margin-top:8px"><thead><tr>';
-  html += '<th>家庭成员</th><th>产品</th><th>总保额(USD)</th><th>总保额(HKD)</th><th>年保费(USD)</th><th>年保费(HKD)</th><th>供款期</th>';
+  const { label: currLabel2 } = getCurr();
+  html += `<th>家庭成员</th><th>产品</th><th>总保额(USD)</th><th>总保额(${currLabel2})</th><th>年保费(USD)</th><th>年保费(${currLabel2})</th><th>供款期</th>`;
   html += '</tr></thead><tbody>';
   let grandTotalUsd = 0;
   personOrder.forEach(person => {
