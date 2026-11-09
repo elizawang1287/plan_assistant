@@ -9,3 +9,11 @@ venv/
 .preview/
 *.tmp
 _v.py
+
+# 临时调试文件
+_tmp_*
+test_*
+*.log
+*.pptx
+*.png
+scripts/_tmp_*
