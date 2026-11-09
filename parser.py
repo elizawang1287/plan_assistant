@@ -918,12 +918,15 @@ def parse_basic_from_text(text):
     savings_no_sum = {"PRMESP"}
     # 定期寿险/终身寿险产品（PLT系列 + PLP2）：表格布局特殊，需单独提取保额
     term_life_products = {"PLT1", "PLT5", "PLT10", "PLT20", "PLT", "PLP2"}
+    # 重疾类产品（CIM3/CIE3/CIP2等）：产品代码后多行数字（年缴/保障年期/保额/供款期）
+    critical_illness_products = {"CIM3", "CIE3", "CIP2", "CIT2", "CIT", "CPER"}
     if product in savings_no_sum:
         sum_assured = None
-    elif product in term_life_products:
-        # 定期寿险：从产品代码括号往后找所有数字，排除年缴和<100的，剩下的就是保额
+    elif product in term_life_products or product in critical_illness_products:
+        # 定期寿险/重疾类：从产品代码括号往后找所有数字，排除年缴和<100的，剩下的就是保额
         sum_assured = None
-        m = re.search(r"\(\s*(" + "|".join(term_life_products) + r")\s*\)", text)
+        all_products = list(term_life_products | critical_illness_products)
+        m = re.search(r"\(\s*(" + "|".join(all_products) + r")\s*\)", text)
         if m:
             # 产品名后面的500字符
             tail = text[m.end():m.end()+500]
