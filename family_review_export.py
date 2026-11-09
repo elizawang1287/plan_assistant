@@ -474,6 +474,106 @@ def _assign_shots(policies, shot_candidates):
     return assign
 
 
+def _cn_num_to_int(s):
+    """把 '二' / '十五' / '二十' / '11' 这类写法转成整数，认不出返回 None。"""
+    if not s:
+        return None
+    if s.isdigit():
+        return int(s)
+    cn = {'零': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
+    if '十' in s:
+        parts = s.split('十')
+        tens = cn.get(parts[0], 1) if parts[0] else 1
+        ones = cn.get(parts[1], 0) if len(parts) > 1 and parts[1] else 0
+        return tens * 10 + ones
+    return cn.get(s)
+
+
+def _extract_year_value(path, text=""):
+    """提取「第N年提取」里的 N（支持中文数字），认不出返回 9999（排到最后）。"""
+    import re
+    import os
+    name = os.path.basename(path)
+    num = r'([0-9一二三四五六七八九十]+)'
+    m = re.search(r'第\s*' + num + r'\s*年', name) or re.search(num + r'\s*年', name)
+    if not m and text:
+        m = re.search(r'第\s*' + num + r'\s*(?:個保單年度|年)', text)
+    if not m:
+        return 9999
+    val = _cn_num_to_int(m.group(1))
+    return val if val is not None else 9999
+
+
+def _extract_insured_name(text):
+    import re
+    m = re.search(r"受保人\s*\n?\s*[A-Z ]*([\u4e00-\u9fff]{2,5})\s*\(", text)
+    return m.group(1) if m else ""
+
+
+def _order_extract_paths(policies, extract_paths):
+    """提取方案排序：先按产品分组（组顺序与产品详情页一致），组内按「第N年提取」从小到大。
+    认不出属于哪个产品的，排在最后并保持上传顺序。
+    """
+    import os
+
+    groups = {}
+    others = []
+    for idx, path in enumerate(extract_paths):
+        text = ""
+        code = ""
+        pname = ""
+        insured = ""
+        try:
+            import fitz
+            from parser import parse_basic_from_text
+            doc = fitz.open(path)
+            for i in range(min(10, len(doc))):
+                text += doc[i].get_text() + "\n"
+            doc.close()
+            basic = parse_basic_from_text(text)
+            code = (basic.get("product_code") or "").upper()
+            pname = basic.get("product_name") or ""
+            insured = _extract_insured_name(text)
+        except Exception as e:
+            print(f"提取方案排序解析失败 {os.path.basename(path)}: {e}")
+
+        year = _extract_year_value(path, text)
+
+        best_i = None
+        best_score = 0
+        for i, p in enumerate(policies):
+            score = 0
+            pc = (p.get("product_code") or "").upper()
+            pn = p.get("product_name") or ""
+            if code and pc:
+                if code == pc or code in pc or pc in code:
+                    score += 50
+            if pname and pn and len(pname) >= 4 and len(pn) >= 4:
+                if pname[:6] in pn or pn[:6] in pname:
+                    score += 30
+            pi = p.get("insured_name") or ""
+            if insured and pi and (insured in pi or pi in insured):
+                score += 30
+            if score > best_score:
+                best_score = score
+                best_i = i
+
+        item = (year, idx, path)
+        if best_i is None:
+            others.append(item)
+        else:
+            groups.setdefault(best_i, []).append(item)
+
+    ordered = []
+    for i in range(len(policies)):
+        if i in groups:
+            for _, _, p in sorted(groups[i]):
+                ordered.append(p)
+    for _, _, p in sorted(others):
+        ordered.append(p)
+    return ordered
+
+
 def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟", extract_paths=None, shot_paths=None):
     """生成家庭保单检视PPT（竖版A4）。
     extract_paths: 提取方案文件路径列表（PDF/图片）
@@ -984,8 +1084,13 @@ def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟
             slide.shapes.add_picture(img_buf, left, top, width=pic_w, height=pic_h)
 
     # ===== 每个提取方案PDF生成一页PPT =====
+    # 先按产品分组（顺序同产品详情页），组内按「第N年提取」从小到大
     from parser import parse_basic_from_text
-    for extract_idx, extract_file_path in enumerate(extract_paths):
+    ordered_extracts = _order_extract_paths(policies, extract_paths)
+    if ordered_extracts:
+        import os as _os
+        print("提取方案顺序: " + " | ".join(_os.path.basename(x) for x in ordered_extracts))
+    for extract_idx, extract_file_path in enumerate(ordered_extracts):
         # 先判断是不是储蓄类PDF，重疾类PDF不做提取方案表格
         try:
             import fitz
