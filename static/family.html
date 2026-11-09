@@ -509,8 +509,49 @@ function render() {
     html += '</tbody></table>';
     html += '<div style="font-size:11px;color:var(--gray);margin-top:8px;padding:0 16px">保证收益为保险公司承诺的最低现金价值，不包含非保证红利与终期分红</div>';
 
+    // 详细模式也显示产品介绍
+    html += renderProductDescs(policies);
+
     resultArea.innerHTML = html;
     return;
+  }
+
+  // 渲染产品介绍卡片（简单/详细模式共用）
+  function renderProductDescs(pols) {
+    const seenProducts = new Set();
+    let html = '';
+    const productDescs = [];
+    pols.forEach(p => {
+      const code = p.product_code;
+      if (!code || seenProducts.has(code)) return;
+      seenProducts.add(code);
+      const desc = PRODUCT_DESC[code];
+      if (!desc) return;
+      // 兼容详细模式（数据在p.basic里）和简单模式（数据在p顶层）
+      const b = p.basic || p;
+      const annual_premium = parseFloat(b.annual_premium) || 0;
+      const sum_assured = parseFloat(b.sum_assured) || 0;
+      const pay_years = parseInt(b.pay_years) || 0;
+      const premium = annual_premium ? '$' + annual_premium.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—';
+      const sa = sum_assured ? '$' + sum_assured.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—';
+      const payYears = pay_years ? pay_years + '年供款' : '—';
+      productDescs.push(`
+        <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:15px;font-weight:700;margin-bottom:10px;color:var(--pr)">${desc.title}</div>
+          <div style="font-size:13px;line-height:1.8;color:var(--ink)">
+            <div>• <b>功能：</b>${desc.func}</div>
+            <div>• <b>用途：</b>${desc.use}</div>
+            <div>• <b>特点：</b>${desc.feature}</div>
+            <div>• <b>本保单：</b>保额 ${sa}，年缴 ${premium}，${payYears}</div>
+          </div>
+        </div>`);
+    });
+    if (productDescs.length > 0) {
+      html += '<div class="group-section"><div class="group-title">产品介绍</div>';
+      html += productDescs.join('');
+      html += '</div>';
+    }
+    return html;
   }
 
   // ===== 简单模式：显示现在的简单对比表 =====
@@ -659,38 +700,7 @@ function render() {
   html += '</div>';
 
   // ===== 4. 产品介绍（每个产品一段，年保费动态填充） =====
-  const seenProducts = new Set();
-  const productDescs = [];
-  policies.forEach(p => {
-    const code = p.product_code;
-    if (!code || seenProducts.has(code)) return;
-    seenProducts.add(code);
-    const desc = PRODUCT_DESC[code];
-    if (!desc) return;
-    // 兼容详细模式（数据在p.basic里）和简单模式（数据在p顶层）
-    const b = p.basic || p;
-    const annual_premium = parseFloat(b.annual_premium) || 0;
-    const sum_assured = parseFloat(b.sum_assured) || 0;
-    const pay_years = parseInt(b.pay_years) || 0;
-    const premium = annual_premium ? '$' + annual_premium.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—';
-    const sa = sum_assured ? '$' + sum_assured.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—';
-    const payYears = pay_years ? pay_years + '年供款' : '—';
-    productDescs.push(`
-      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px;">
-        <div style="font-size:15px;font-weight:700;margin-bottom:10px;color:var(--pr)">${desc.title}</div>
-        <div style="font-size:13px;line-height:1.8;color:var(--ink)">
-          <div>• <b>功能：</b>${desc.func}</div>
-          <div>• <b>用途：</b>${desc.use}</div>
-          <div>• <b>特点：</b>${desc.feature}</div>
-          <div>• <b>本保单：</b>保额 ${sa}，年缴 ${premium}，${payYears}</div>
-        </div>
-      </div>`);
-  });
-  if (productDescs.length > 0) {
-    html += '<div class="group-section"><div class="group-title">产品介绍</div>';
-    html += productDescs.join('');
-    html += '</div>';
-  }
+  html += renderProductDescs(policies);
 
   resultArea.innerHTML = html;
 }
