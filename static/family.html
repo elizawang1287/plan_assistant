@@ -476,7 +476,9 @@ function render() {
     const detailData = window._detailData || policies;
     // 总缴费表
     html += '<div class="group-section"><div class="group-title">总缴费对比</div>';
-    html += '<table style="font-size:12px"><thead><tr><th style="text-align:left">产品</th><th>年缴(USD)</th><th>供款期</th><th>总保费(USD)</th><th>总保费(HKD)</th></tr></thead><tbody>';
+    const { label: totalCurrLabel, rate: totalCurrRate, isHkd: totalIsHkd } = getCurr();
+    const totalCurrPrefix = totalIsHkd ? 'HK$' : '¥';
+    html += `<table style="font-size:12px"><thead><tr><th style="text-align:left">产品</th><th>年缴(USD)</th><th>供款期</th><th>总保费(USD)</th><th>总保费(${totalCurrLabel})</th></tr></thead><tbody>`;
     detailData.forEach(p => {
       const b = p.basic || p;
       const ap = b.annual_premium;
@@ -484,8 +486,7 @@ function render() {
       const cat = b.category || p.category || '';
       const payStr = cat.includes('医疗') ? '终身' : (py ? py + '年' : '—');
       const tp = b.total_premium;
-      const r = parseFloat(rateHkd.value)||7.8;
-      html += `<tr><td style="text-align:left">${p.product_name}</td><td>$${(ap||0).toLocaleString()}</td><td>${payStr}</td><td>$${(tp||0).toLocaleString()}</td><td>HK$${Math.round((tp||0)*r).toLocaleString()}</td></tr>`;
+      html += `<tr><td style="text-align:left">${p.product_name}</td><td>$${(ap||0).toLocaleString()}</td><td>${payStr}</td><td>$${(tp||0).toLocaleString()}</td><td>${totalCurrPrefix}${Math.round((tp||0)*totalCurrRate).toLocaleString()}</td></tr>`;
     });
     html += '</tbody></table></div>';
 
