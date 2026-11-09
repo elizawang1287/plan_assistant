@@ -518,23 +518,37 @@ function render() {
 
   // 渲染产品介绍卡片（简单/详细模式共用）
   function renderProductDescs(pols) {
-    const seenProducts = new Set();
-    let html = '';
-    const productDescs = [];
+    // 按product_code分组
+    const byCode = {};
     pols.forEach(p => {
       const code = p.product_code;
-      if (!code || seenProducts.has(code)) return;
-      seenProducts.add(code);
+      if (!code) return;
+      if (!byCode[code]) byCode[code] = [];
+      byCode[code].push(p);
+    });
+
+    let html = '';
+    const productDescs = [];
+    Object.keys(byCode).forEach(code => {
       const desc = PRODUCT_DESC[code];
       if (!desc) return;
-      // 兼容详细模式（数据在p.basic里）和简单模式（数据在p顶层）
-      const b = p.basic || p;
-      const annual_premium = parseFloat(b.annual_premium) || 0;
-      const sum_assured = parseFloat(b.sum_assured) || 0;
-      const pay_years = parseInt(b.pay_years) || 0;
-      const premium = annual_premium ? '$' + annual_premium.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—';
-      const sa = sum_assured ? '$' + sum_assured.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—';
-      const payYears = pay_years ? pay_years + '年供款' : '—';
+      const group = byCode[code];
+      // 每个保单的"本保单"信息
+      const policyLines = group.map(p => {
+        const b = p.basic || p;
+        const annual_premium = parseFloat(b.annual_premium) || 0;
+        const sum_assured = parseFloat(b.sum_assured) || 0;
+        const pay_years = parseInt(b.pay_years) || 0;
+        const sa = sum_assured ? '$' + sum_assured.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—';
+        const premium = annual_premium ? '$' + annual_premium.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—';
+        const payYears = pay_years ? pay_years + '年供款' : '—';
+        // 加上受保人信息（如果有）
+        const age = b.anb_age || b.age;
+        const gender = b.gender;
+        const personLabel = age && gender ? `${age}岁${gender}：` : '';
+        return `${personLabel}保额 ${sa}，年缴 ${premium}，${payYears}`;
+      });
+      const policyStr = policyLines.join('<br>');
       productDescs.push(`
         <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px;">
           <div style="font-size:15px;font-weight:700;margin-bottom:10px;color:var(--pr)">${desc.title}</div>
@@ -542,7 +556,7 @@ function render() {
             <div>• <b>功能：</b>${desc.func}</div>
             <div>• <b>用途：</b>${desc.use}</div>
             <div>• <b>特点：</b>${desc.feature}</div>
-            <div>• <b>本保单：</b>保额 ${sa}，年缴 ${premium}，${payYears}</div>
+            <div>• <b>本保单（共${group.length}张）：</b><br>${policyStr}</div>
           </div>
         </div>`);
     });
