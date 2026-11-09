@@ -288,6 +288,14 @@ function fmtTotalHkdCell(p) {
     return fmtSumHkdCell(totalPremiumOf(p));
   }
 }
+// 供款期：医疗类显示"终身"
+function fmtPayYears(p) {
+  const cat = p.category || '';
+  if (cat.includes('医疗')) {
+    return '终身';
+  }
+  return p.pay_years ? p.pay_years + '年' : '—';
+}
 // 根据产品类型返回列名
 function totalColLabel(p) {
   const cat = p.category || '';
@@ -473,9 +481,11 @@ function render() {
       const b = p.basic || p;
       const ap = b.annual_premium;
       const py = b.pay_years;
+      const cat = b.category || p.category || '';
+      const payStr = cat.includes('医疗') ? '终身' : (py ? py + '年' : '—');
       const tp = b.total_premium;
       const r = parseFloat(rateHkd.value)||7.8;
-      html += `<tr><td style="text-align:left">${p.product_name}</td><td>$${(ap||0).toLocaleString()}</td><td>${py||'—'}年</td><td>$${(tp||0).toLocaleString()}</td><td>HK$${Math.round((tp||0)*r).toLocaleString()}</td></tr>`;
+      html += `<tr><td style="text-align:left">${p.product_name}</td><td>$${(ap||0).toLocaleString()}</td><td>${payStr}</td><td>$${(tp||0).toLocaleString()}</td><td>HK$${Math.round((tp||0)*r).toLocaleString()}</td></tr>`;
     });
     html += '</tbody></table></div>';
 
@@ -715,7 +725,7 @@ function render() {
         html += `<td style="white-space:nowrap">${pol.first_10y_bonus ? fmtSumCell(pol.first_10y_bonus) : '—'}</td>`;
         html += `<td style="white-space:nowrap">${fmtPremCell(pol.annual_premium)}</td>`;
         html += `<td style="white-space:nowrap">${fmtPremHkdCell(pol.annual_premium)}</td>`;
-        html += `<td>${pol.pay_years ? pol.pay_years + '年' : '—'}</td>`;
+        html += `<td>${fmtPayYears(pol)}</td>`;
         html += '</tr>';
       });
     });
@@ -754,7 +764,7 @@ function render() {
         <td class="num">${p.first_10y_bonus ? fmtSumCell(p.first_10y_bonus) : '—'}</td>
         <td class="num">${fmt(p.annual_premium)}</td>
         <td class="num">${fmtCurr(p.annual_premium)}</td>
-        <td class="num">${p.pay_years ? p.pay_years+'年' : '—'}</td>
+        <td class="num">${fmtPayYears(p)}</td>
       </tr>`;
     });
   });
