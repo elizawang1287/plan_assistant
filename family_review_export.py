@@ -256,6 +256,166 @@ def _load_images_from_paths(paths):
     return all_images
 
 
+# 产品特征词映射：财务概览文件里通常带产品名，用有区分度的特征词识别，避免"保險計劃"这类通用词误配
+_PRODUCT_KEYWORDS = {
+    "PRMESP": ["世譽", "世誉", "PRMESP"],
+    "TRST": ["信守明天", "TRST"],
+    "CIM": ["誠保一生", "诚保一生", "智危", "CIM"],
+    "CIE": ["危疾首護", "危疾首护", "CIE"],
+    "PHOR": ["誠譽", "诚誉", "PHOR"],
+    "LFRE": ["雋珀", "隽珀", "LFRE"],
+    "PLP": ["美好人生", "PLP"],
+    "PLT": ["守護家人", "守护家人", "PLT"],
+    "PLJ": ["PLJ"],
+    "MCVIP": ["MCVIP", "醫療", "医疗"],
+}
+
+# 通用词：不能用于区分产品，匹配前先剔除
+_GENERIC_WORDS = ["保險計劃", "保险计划", "保險", "保险", "計劃", "计划", "保障", "財富", "财富", "多元貨幣", "多元货币", "危疾"]
+
+
+def _norm_text(s):
+    """归一化文本：全角转半角，去掉空格/横线/标点，只留数字字母中文，大写。"""
+    import re
+    if not s:
+        return ""
+    s = str(s)
+    res = []
+    for ch in s:
+        code = ord(ch)
+        if code == 0x3000:
+            res.append(" ")
+        elif 0xFF01 <= code <= 0xFF5E:
+            res.append(chr(code - 0xFEE0))
+        else:
+            res.append(ch)
+    s = "".join(res)
+    return re.sub(r"[^0-9a-zA-Z\u4e00-\u9fff]", "", s).upper()
+
+
+def _product_keywords(policy):
+    """按产品代码/产品名给出有区分度的特征词列表。"""
+    code = (policy.get("product_code") or "").upper()
+    name = policy.get("product_name") or ""
+    # 先按产品代码前缀找（CIM3/CIM1 都归 CIM）
+    for prefix, kws in _PRODUCT_KEYWORDS.items():
+        if prefix in code:
+            return kws
+    # 代码认不出，从产品名里剔除通用词后取剩下的特征片段
+    kws = []
+    cleaned = name
+    for gw in _GENERIC_WORDS:
+        cleaned = cleaned.replace(gw, "")
+    cleaned = cleaned.strip("【】「」（）() ")
+    if len(cleaned) >= 3:
+        kws.append(cleaned[:6])
+    return kws
+
+
+def _build_shot_candidates(shot_paths):
+    """把财务概览文件逐一转成候选：{path, text, image, used}。
+    关键：每个文件单独配对一张图，不用全局图片列表下标，避免 PDF 多页时错位。
+    """
+    import os
+    candidates = []
+    for path in shot_paths:
+        ext = os.path.splitext(path)[1].lower()
+        text = ""
+        image = None
+        try:
+            if ext == '.pdf':
+                import fitz
+                doc = fitz.open(path)
+                text = doc[0].get_text() if len(doc) > 0 else ""
+                doc.close()
+                imgs = _pdf_to_images(path)
+                image = imgs[0] if imgs else None
+            elif ext in ('.png', '.jpg', '.jpeg', '.gif', '.bmp'):
+                from PIL import Image
+                image = Image.open(path)
+            elif ext in ('.html', '.htm'):
+                import re
+                raw = ""
+                for enc in ('utf-8', 'gbk'):
+                    try:
+                        with open(path, 'r', encoding=enc, errors='ignore') as f:
+                            raw = f.read()
+                        break
+                    except Exception:
+                        continue
+                # 剥掉标签和实体，拿到可匹配的纯文本
+                text = re.sub(r'<[^>]+>', ' ', raw)
+                text = text.replace('&nbsp;', ' ').replace('&amp;', '&')
+                image = _html_to_image(path)
+        except Exception as e:
+            print(f"财务概览加载失败 {path}: {e}")
+            continue
+        if image is None:
+            continue
+        candidates.append({"path": path, "text": text, "image": image, "used": False})
+    return candidates
+
+
+def _score_shot_match(policy, text, keywords):
+    """给一份财务概览对某个保单的打分。"""
+    text_n = _norm_text(text)
+    score = 0
+    reasons = []
+    billing = _norm_text(policy.get("billing_number", ""))
+    if len(billing) >= 5 and billing in text_n:
+        score += 100
+        reasons.append("保单号")
+    for kw in keywords:
+        kw_n = _norm_text(kw)
+        if kw_n and kw_n in text_n:
+            score += 40
+            reasons.append(f"产品词[{kw}]")
+            break
+    name = policy.get("insured_name", "")
+    if name and _norm_text(name) in text_n:
+        score += 30
+        reasons.append("受保人")
+    return score, reasons
+
+
+def _assign_shots(policies, shot_candidates):
+    """先整体分配财务概览，再生成PPT：保证一对一、不重复、不缺页。"""
+    import os
+    assign = {}
+    if not shot_candidates:
+        return assign
+    for p in policies:
+        kw = _product_keywords(p)
+        best = None
+        best_score = 0
+        best_reason = ""
+        for c in shot_candidates:
+            if c["used"]:
+                continue
+            score, reasons = _score_shot_match(p, c["text"], kw)
+            if score > best_score:
+                best_score = score
+                best = c
+                best_reason = "+".join(reasons)
+        # 至少要命中一项身份证据（名字30分/产品词40分/保单号100分）
+        if best is not None and best_score >= 30:
+            best["used"] = True
+            assign[id(p)] = best
+            print(f"  财务概览匹配({best_reason}, 分数{best_score}): {os.path.basename(best['path'])} -> {p.get('product_name', '')}")
+    # 兜底：没匹配上的产品，按顺序分配剩下的财务概览，避免缺页
+    remaining = [c for c in shot_candidates if not c["used"]]
+    for p in policies:
+        if id(p) in assign:
+            continue
+        if not remaining:
+            break
+        c = remaining.pop(0)
+        c["used"] = True
+        assign[id(p)] = c
+        print(f"  财务概览按顺序兜底: {os.path.basename(c['path'])} -> {p.get('product_name', '')}")
+    return assign
+
+
 def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟", extract_paths=None, shot_paths=None):
     """生成家庭保单检视PPT（竖版A4）。
     extract_paths: 提取方案文件路径列表（PDF/图片）
@@ -393,7 +553,9 @@ def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟
 
     # 加载提取方案和财务概览图片
     extract_images = _load_images_from_paths(extract_paths) if extract_paths else []
-    shot_images = _load_images_from_paths(shot_paths) if shot_paths else []
+    shot_candidates = _build_shot_candidates(shot_paths) if shot_paths else []
+    # 生成PPT前先把财务概览和产品一一分配好（保单号 > 产品特征词 > 受保人名字）
+    shot_assign = _assign_shots(policies, shot_candidates)
 
     # ===== Slide 3: 储蓄计划提取现金价值汇总 =====
     # 先筛选出储蓄类产品
@@ -735,65 +897,10 @@ def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟
         except Exception as e:
             print(f"嵌入PDF截图失败: {e}")
         
-        # 每个产品详情页后面跟着对应的财务概览页
-        billing_number = p.get("billing_number", "")
-        insured_name = p.get("insured_name", "")
-        product_name = p.get("product_name", "")
-        age = p.get("age", "")
-        gender = p.get("gender", "")
-        matched_shot = None
-        
-        if shot_images:
-            # 第一步：优先用保单号匹配（最准）
-            if billing_number:
-                for shot_idx, shot_path in enumerate(shot_paths):
-                    try:
-                        ext = shot_path.lower()
-                        text = ""
-                        if ext.endswith('.pdf'):
-                            import fitz
-                            doc = fitz.open(shot_path)
-                            for j in range(min(5, len(doc))):
-                                text += doc[j].get_text() + "\n"
-                            doc.close()
-                        elif ext.endswith('.html') or ext.endswith('.htm'):
-                            with open(shot_path, 'r', encoding='utf-8') as f:
-                                text = f.read()
-                        
-                        if billing_number in text:
-                            matched_shot = shot_images[shot_idx]
-                            print(f"  财务概览保单号匹配成功: {billing_number}")
-                            break
-                    except:
-                        pass
-            
-            # 第二步：保单号匹配不上，用受保人名字+产品名匹配
-            if not matched_shot and insured_name:
-                for shot_idx, shot_path in enumerate(shot_paths):
-                    try:
-                        ext = shot_path.lower()
-                        text = ""
-                        if ext.endswith('.pdf'):
-                            import fitz
-                            doc = fitz.open(shot_path)
-                            for j in range(min(5, len(doc))):
-                                text += doc[j].get_text() + "\n"
-                            doc.close()
-                        elif ext.endswith('.html') or ext.endswith('.htm'):
-                            with open(shot_path, 'r', encoding='utf-8') as f:
-                                text = f.read()
-                        
-                        # 匹配条件：受保人名字 + 产品名关键词
-                        name_match = insured_name and insured_name in text
-                        product_match = product_name and any(keyword in text for keyword in [product_name[:4], product_name[-4:]])
-                        
-                        if name_match and product_match:
-                            matched_shot = shot_images[shot_idx]
-                            print(f"  财务概览名字+产品匹配成功: {insured_name} - {product_name}")
-                            break
-                    except:
-                        pass
-        
+        # 每个产品详情页后面跟着对应的财务概览页（用预先分配好的结果）
+        matched_candidate = shot_assign.get(id(p))
+        matched_shot = matched_candidate["image"] if matched_candidate else None
+
         if matched_shot:
             slide = prs.slides.add_slide(prs.slide_layouts[6])
             # 标题条
