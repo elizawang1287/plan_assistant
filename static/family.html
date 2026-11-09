@@ -676,7 +676,7 @@ function render() {
         html += `<td style="white-space:nowrap">${fmtSumCell(totalPremiumOf(pol))}</td>`;
         html += `<td style="white-space:nowrap">${fmtSumHkdCell(totalPremiumOf(pol))}</td>`;
         // 前十年赠送保额：暂留空，可手填
-        html += `<td style="white-space:nowrap">${pol.bonus_10y ? fmtSumCell(pol.bonus_10y) : '—'}</td>`;
+        html += `<td style="white-space:nowrap">${pol.first_10y_bonus ? fmtSumCell(pol.first_10y_bonus) : '—'}</td>`;
         html += `<td style="white-space:nowrap">${fmtPremCell(pol.annual_premium)}</td>`;
         html += `<td style="white-space:nowrap">${fmtPremHkdCell(pol.annual_premium)}</td>`;
         html += `<td>${pol.pay_years ? pol.pay_years + '年' : '—'}</td>`;
@@ -716,7 +716,7 @@ function render() {
         <td class="left">${p.product_name}</td>
         <td class="num">${sa}</td>
         <td class="num">${saHkd}</td>
-        <td class="num">${p.bonus_10y ? fmtSumCell(p.bonus_10y) : '—'}</td>
+        <td class="num">${p.first_10y_bonus ? fmtSumCell(p.first_10y_bonus) : '—'}</td>
         <td class="num">${fmt(p.annual_premium)}</td>
         <td class="num">HK$${Math.round((p.annual_premium||0)*(parseFloat(rateHkd.value)||7.8)).toLocaleString()}</td>
         <td class="num">${p.pay_years ? p.pay_years+'年' : '—'}</td>

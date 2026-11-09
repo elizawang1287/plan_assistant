@@ -969,6 +969,21 @@ def parse_basic_from_text(text):
                     break
     info["sum_assured"] = sum_assured
 
+    # 前十年赠送保额（升级保障 CIMEx / 首十年额外保障）
+    bonus_10y = None
+    for pat in [
+        r"[附附]有升[級级]保障\s*\([A-Za-z0-9]+\)\s*\n?\s*([\d,]+\.?\d*)",
+        r"升[級级]保障\s*\n?\s*([\d,]+\.?\d*)",
+        r"(?:首十年|首10年|前十年)[^\d\n]{0,24}\s*\n?\s*([\d,]+\.?\d*)",
+    ]:
+        m = re.search(pat, text)
+        if m:
+            val = _to_num(m.group(1))
+            if val and val >= 1000:
+                bonus_10y = val
+                break
+    info["first_10y_bonus"] = bonus_10y
+
     # 供款年期（繁简都支持）
     # PDF文本里"保費供款年期"是表头，值在后面几行，不是同一行
     pay_years = None
