@@ -653,11 +653,32 @@ document.getElementById('rateRmb').oninput = render;
 document.getElementById('btnExport').onclick = async () => {
   statusEl.textContent = '正在生成 PPT...';
   try {
+    // 把policies转换成后端期望的格式（简单模式结构）
+    const exportPolicies = policies.map(p => {
+      if (p.basic) {
+        // 详细模式：从basic对象提取基本信息
+        const b = p.basic;
+        return {
+          product_code: p.product_code,
+          product_name: p.product_name,
+          category: b.category || '储蓄/退休',
+          age: b.anb_age,
+          gender: b.gender,
+          sum_assured: b.sum_assured,
+          annual_premium: b.annual_premium,
+          pay_years: b.pay_years,
+          total_premium: b.total_premium,
+          currency: b.currency || 'USD',
+          filename: p.filename,
+        };
+      }
+      return p;
+    });
     const resp = await fetch('/api/family-export-ppt', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        policies: policies,
+        policies: exportPolicies,
         usd_hkd: parseFloat(rateHkd.value)||7.8,
         usd_rmb: parseFloat(rateRmb.value)||7.2,
       })
