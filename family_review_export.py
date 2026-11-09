@@ -523,21 +523,43 @@ def _order_extract_paths(policies, extract_paths):
         code = ""
         pname = ""
         insured = ""
+        year = None
         try:
             import fitz
-            from parser import parse_basic_from_text
+            from parser import parse_basic_from_text, parse_withdrawal
             doc = fitz.open(path)
-            for i in range(min(10, len(doc))):
-                text += doc[i].get_text() + "\n"
-            doc.close()
-            basic = parse_basic_from_text(text)
+            head = ""
+            for i in range(min(5, len(doc))):
+                head += doc[i].get_text() + "\n"
+            basic = parse_basic_from_text(head)
             code = (basic.get("product_code") or "").upper()
             pname = basic.get("product_name") or ""
-            insured = _extract_insured_name(text)
+            insured = _extract_insured_name(head)
+            # 内容优先：从逐年表格里解析「第N年开始提取」
+            body = ""
+            for i in range(12, min(22, len(doc))):
+                body += doc[i].get_text() + "\n"
+            doc.close()
+            if "TRST" in head or "信守明天" in head:
+                code = "TRST"
+            elif "PRMESP" in head or "世譽" in head or "世誉" in head:
+                code = "PRMESP"
+            if body and code:
+                try:
+                    wd = parse_withdrawal(body, 0, code)
+                    if wd:
+                        year = wd.get("start_year")
+                except Exception:
+                    year = None
         except Exception as e:
             print(f"提取方案排序解析失败 {os.path.basename(path)}: {e}")
 
-        year = _extract_year_value(path, text)
+        # 内容解析不到再退回文件名
+        if year is None:
+            fn_year = _extract_year_value(path, text)
+            year = None if fn_year == 9999 else fn_year
+        if year is None:
+            year = 9999
 
         best_i = None
         best_score = 0
