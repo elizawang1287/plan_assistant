@@ -263,6 +263,13 @@ function fmtPremHkdCell(v) {
   const sym = isHkd ? 'HK$' : '¥';
   return sym + Math.round(cv).toLocaleString();
 }
+// 总保费 = 年缴 × 供款期（储蓄类无「保额」，统一用总保费口径）
+function totalPremiumOf(p) {
+  const ap = parseFloat(p.annual_premium) || 0;
+  const py = parseInt(p.pay_years) || 0;
+  if (!ap) return null;
+  return py > 0 ? ap * py : ap;
+}
 
 // 编辑表用的固定换算（HKD / RMB）
 function fmtHkd(v) {
@@ -639,17 +646,16 @@ function render() {
     html += `<div style="background:#fff;border-radius:10px;padding:16px;margin-bottom:16px;border:1px solid var(--line)">`;
     html += `<div style="font-size:15px;font-weight:700;margin-bottom:12px;color:var(--pr)">${cat}</div>`;
 
-    // 表格：家庭成员 | 产品 | 总保额(USD) | 总保额(换算) | 年保费(USD) | 年保费(换算) | 供款期 | 最后剩余价值
+    // 表格：家庭成员 | 产品 | 总保费(USD) | 总保费(换算) | 年保费(USD) | 年保费(换算) | 供款期
     const { label: currLabel } = getCurr();
     html += '<table style="font-size:12px"><thead><tr>';
     html += '<th style="text-align:left;width:110px">家庭成员</th>';
     html += '<th style="text-align:left">产品</th>';
-    html += '<th>总保额(USD)</th>';
-    html += `<th>总保额(${currLabel})</th>`;
+    html += '<th>总保费(USD)</th>';
+    html += `<th>总保费(${currLabel})</th>`;
     html += '<th>年保费(USD)</th>';
     html += `<th>年保费(${currLabel})</th>`;
     html += '<th style="width:60px">供款期</th>';
-    html += '<th>最后剩余价值(USD)</th>';
     html += '</tr></thead><tbody>';
 
     // 按人分组输出
@@ -666,14 +672,11 @@ function render() {
           html += `<td rowspan="${personPols.length}" style="font-weight:700;text-align:left;background:#f8f9fa;vertical-align:middle">${person}</td>`;
         }
         html += `<td style="text-align:left">${pol.product_name||'—'}</td>`;
-        html += `<td style="white-space:nowrap">${fmtSumCell(pol.sum_assured)}</td>`;
-        html += `<td style="white-space:nowrap">${fmtSumHkdCell(pol.sum_assured)}</td>`;
+        html += `<td style="white-space:nowrap">${fmtSumCell(totalPremiumOf(pol))}</td>`;
+        html += `<td style="white-space:nowrap">${fmtSumHkdCell(totalPremiumOf(pol))}</td>`;
         html += `<td style="white-space:nowrap">${fmtPremCell(pol.annual_premium)}</td>`;
         html += `<td style="white-space:nowrap">${fmtPremHkdCell(pol.annual_premium)}</td>`;
         html += `<td>${pol.pay_years ? pol.pay_years + '年' : '—'}</td>`;
-        // 最后剩余价值（储蓄险）
-        const lastSv = pol.last_surrender_value;
-        html += `<td style="white-space:nowrap">${lastSv ? '$' + Number(lastSv).toLocaleString('en-US', {maximumFractionDigits: 0}) : '—'}</td>`;
         html += '</tr>';
       });
     });
@@ -695,15 +698,16 @@ function render() {
   });
   html += '<table style="margin-top:8px"><thead><tr>';
   const { label: currLabel2 } = getCurr();
-  html += `<th>家庭成员</th><th>产品</th><th>总保额(USD)</th><th>总保额(${currLabel2})</th><th>年保费(USD)</th><th>年保费(${currLabel2})</th><th>供款期</th>`;
+  html += `<th>家庭成员</th><th>产品</th><th>总保费(USD)</th><th>总保费(${currLabel2})</th><th>年保费(USD)</th><th>年保费(${currLabel2})</th><th>供款期</th>`;
   html += '</tr></thead><tbody>';
   let grandTotalUsd = 0;
   personOrder.forEach(person => {
     const pols = personPolicies[person];
     pols.forEach((p, idx) => {
       grandTotalUsd += p.annual_premium || 0;
-      const sa = p.sum_assured ? (p.sum_assured >= 10000 ? `$${(p.sum_assured/10000).toFixed(p.sum_assured>=1000000?0:1)}万` : `$${p.sum_assured.toLocaleString()}`) : '—';
-      const saHkd = p.sum_assured ? `HKD ${(p.sum_assured*(parseFloat(rateHkd.value)||7.8)/10000).toFixed(p.sum_assured*(parseFloat(rateHkd.value)||7.8)>=1000000?0:1)}万` : '—';
+      const tp = totalPremiumOf(p);
+      const sa = fmtSumCell(tp);
+      const saHkd = fmtSumHkdCell(tp);
       html += `<tr>
         <td style="font-weight:700">${idx===0 ? person : ''}</td>
         <td class="left">${p.product_name}</td>
