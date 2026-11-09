@@ -1048,10 +1048,10 @@ def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟
                     else:
                         top_y = 80  # 兜底
                 else:
-                    # 第三页及以后：找"保單年度"表头关键词，往下62点（跳过表头）
+                    # 第三页及以后：找"保單年度"表头关键词，往下64点（跳过表头）
                     title_rects = page.search_for('保單年度')
                     if title_rects:
-                        top_y = title_rects[0].y0 + 62
+                        top_y = title_rects[0].y0 + 64
                     else:
                         top_y = 155  # 兜底
                 # 下边界：找上边界以下的最下面的长水平线
