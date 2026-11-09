@@ -274,26 +274,26 @@ async def family_review_export_ppt(
         if not policies_list:
             raise HTTPException(status_code=400, detail="没有保单数据")
 
-        # 保存提取方案文件到临时目录
-        import tempfile
+        # 保存提取方案文件到临时目录（保留原始文件名，排序要靠文件名里的「第N年提取」）
+        import tempfile, os, uuid
         extract_paths = []
         for f in extract_files:
             data = await f.read()
-            ext = f.filename.split('.')[-1] if '.' in f.filename else 'pdf'
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-            tmp.write(data)
-            tmp.close()
-            extract_paths.append(tmp.name)
+            name = os.path.basename(f.filename or "") or "upload.pdf"
+            save_path = os.path.join(tempfile.gettempdir(), f"up_ext_{uuid.uuid4().hex[:8]}_{name}")
+            with open(save_path, "wb") as fp:
+                fp.write(data)
+            extract_paths.append(save_path)
 
-        # 保存财务概览文件到临时目录
+        # 保存财务概览文件到临时目录（同样保留原始文件名）
         shot_paths = []
         for f in shot_files:
             data = await f.read()
-            ext = f.filename.split('.')[-1] if '.' in f.filename else 'pdf'
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-            tmp.write(data)
-            tmp.close()
-            shot_paths.append(tmp.name)
+            name = os.path.basename(f.filename or "") or "upload.pdf"
+            save_path = os.path.join(tempfile.gettempdir(), f"up_shot_{uuid.uuid4().hex[:8]}_{name}")
+            with open(save_path, "wb") as fp:
+                fp.write(data)
+            shot_paths.append(save_path)
 
         buf = family_review_export.generate_family_review_ppt(
             policies_list,
