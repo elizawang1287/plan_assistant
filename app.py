@@ -36,6 +36,34 @@ def health():
     return {"status": "ok"}
 
 
+# ===== 团队业绩目标存储 =====
+TARGETS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "targets.json")
+
+
+@app.get("/api/targets")
+def get_targets():
+    """读取团队业绩目标"""
+    try:
+        if os.path.exists(TARGETS_FILE):
+            with open(TARGETS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        pass
+    return {}
+
+
+@app.post("/api/targets")
+async def save_targets(payload: dict = None):
+    """保存团队业绩目标"""
+    try:
+        targets = payload or {}
+        with open(TARGETS_FILE, "w", encoding="utf-8") as f:
+            json.dump(targets, f, ensure_ascii=False, indent=2)
+        return {"status": "ok", "count": len(targets)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存失败：{e}")
+
+
 @app.post("/api/parse")
 async def parse_plan(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".pdf"):
