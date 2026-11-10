@@ -235,12 +235,18 @@ async function uploadAll(fileList){
     const groups = {};
     parsed.forEach(d => { const k = baseKey(d); (groups[k] = groups[k]||[]).push(d); });
     const keys = Object.keys(groups);
-    // 给每组加标签
+    // 给每组加标签，并按 start_year 升序排列（提取方案排序）
     const allGroups = keys.map(k=>{
       const variants = groups[k];
+      // 按提取开始年份升序排；没有提取安排的排最后
+      variants.sort((a,b)=>{
+        const sa = (a.withdrawal && a.withdrawal.start_year) || 999;
+        const sb = (b.withdrawal && b.withdrawal.start_year) || 999;
+        return sa - sb;
+      });
       variants.forEach(v=>{
         const w = v.withdrawal||{};
-        v.variant_label = (variants.length>1) ? (v._fname.replace(/\.[^.]+$/,'').slice(0,18)) : (w.start_year?`第${w.start_year}年起提取`:null);
+        v.variant_label = w.start_year ? `第${w.start_year}年起提取` : null;
       });
       const b = variants[0].basic||{};
       const label = variants[0].product_name.replace(/保险计划/g,'') + ` ${b.anb_age}岁 ${(b.total_premium/10000).toFixed(0)}万`;
