@@ -354,13 +354,16 @@ function render(data, fname){
     <tr><td colspan="2" style="text-align:right;color:var(--gray);font-size:12px">优惠比例（可选）：</td>
         <td colspan="2" style="text-align:left">
           <input type="number" id="discountPct" value="0" min="0" max="50" step="0.5" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:13px">
-          <span style="font-size:12px;color:var(--gray)">%（输入后自动计算实际回报率）</span>
+          <span style="font-size:12px;color:var(--gray)">%（首年保费回赠比例，输入后自动计算实际回报率）</span>
         </td></tr>`;
 
   // 计算实际单利/复利（扣除优惠后）
+  // 优惠是首年保费的回赠比例，不是总保费打折
   const calcActualPct = (r, discountPct) => {
     if (!b.total_premium || !discountPct) return { simple: r.simple_pct, compound: r.compound_pct };
-    const actualTotal = b.total_premium * (1 - discountPct / 100);
+    const firstYearPremium = b.annual_premium || b.total_premium;
+    const rebateAmount = firstYearPremium * discountPct / 100;
+    const actualTotal = b.total_premium - rebateAmount;
     const yr = r.year || 1;
     const payYears = b.pay_years || 1;
     const avgYears = yr - (payYears - 1) / 2;
