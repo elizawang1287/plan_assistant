@@ -12,6 +12,7 @@ import os
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import uvicorn
 
@@ -19,6 +20,15 @@ import parser
 import ppt_export
 
 app = FastAPI(title="计划书助手")
+
+# 允许跨域（junrong-team.pages.dev 访问）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 生产环境可以改成具体域名
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
