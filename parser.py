@@ -54,6 +54,17 @@ def detect_product(text):
         return "PHOR"
     if "PACE" in text or "駿譽財富" in text or "骏誉财富" in text:
         return "PACE"
+    # PLT系列：守护家人定期寿险
+    if "守護家人" in text or "守护家人" in text:
+        if "(PLT1)" in text or "（PLT1）" in text:
+            return "PLT1"
+        if "(PLT5)" in text or "（PLT5）" in text:
+            return "PLT5"
+        if "(PLT10)" in text or "（PLT10）" in text:
+            return "PLT10"
+        if "(PLT20)" in text or "（PLT20）" in text:
+            return "PLT20"
+        return "PLT"
     return "UNKNOWN"
 
 
