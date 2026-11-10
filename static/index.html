@@ -351,10 +351,10 @@ function render(data, fname){
         <td>${b.premium_type}${b.pay_years>1?('·'+b.pay_years+'年'):''}</td>
         <td>${b.annual_premium?fmt(b.annual_premium):'-'}</td>
         <td>${b.total_premium?fmt(b.total_premium):'-'}</td></tr>
-    <tr><td colspan="2" style="text-align:right;color:var(--gray);font-size:12px">优惠比例（可选）：</td>
+    <tr><td colspan="2" style="text-align:right;color:var(--gray);font-size:13px;font-weight:600">保费回赠比例（可选）：</td>
         <td colspan="2" style="text-align:left">
-          <input type="number" id="discountPct" value="0" min="0" max="50" step="0.5" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:13px">
-          <span style="font-size:12px;color:var(--gray)">%（首年保费回赠比例，输入后自动计算实际回报率）</span>
+          <input type="number" id="discountPct" value="0" min="0" max="50" step="0.5" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:16px">
+          <span style="font-size:12px;color:var(--gray)">%（首年保费回赠，如50%回赠＝首年保费×50%）</span>
         </td></tr>`;
 
   // 计算实际单利/复利（扣除优惠后）
