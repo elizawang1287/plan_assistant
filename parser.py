@@ -210,7 +210,9 @@ def parse_surrender_table(text, anb_age, total_premium, product="PRMESP"):
     TRST 5列：paid(0), A保证(1), B归原红利(2), C终期红利(3), D退保总额(4)
     """
     is_trst = product in ("TRST", "PACE")
-    n_cols = 5 if is_trst else 4
+    is_plp2 = product == "PLP2"
+    n_cols = 5 if (is_trst or is_plp2) else 4
+    col_e = 4 if is_plp2 else 3  # PLP2的surrender在第4列（最后一列）
 
     def detect_trst_col_g(seg):
         """TRST列序：基础表 paid,A,B,surr,C；补充表 paid,B,C,surr,A。
@@ -246,7 +248,7 @@ def parse_surrender_table(text, anb_age, total_premium, product="PRMESP"):
             seg = seg[:cut]
         col_g = detect_trst_col_g(seg) if is_trst else 1
         rows = _parse_rows_from_lines(seg, anb_age, total_premium, n_cols,
-                                       col_paid=0, col_g=col_g, col_e=3)
+                                       col_paid=0, col_g=col_g, col_e=col_e)
         if rows:
             return rows
 
@@ -267,7 +269,7 @@ def parse_surrender_table(text, anb_age, total_premium, product="PRMESP"):
         seg = seg[:cut]
     col_g = detect_trst_col_g(seg) if is_trst else 1
     return _parse_rows_from_lines(seg, anb_age, total_premium, n_cols,
-                                   col_paid=0, col_g=col_g, col_e=3)
+                                   col_paid=0, col_g=col_g, col_e=col_e)
 
 
 def _irr(annual, pay_years, surrender, yr):

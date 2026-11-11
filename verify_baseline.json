@@ -481,11 +481,11 @@
         "age": 56,
         "paid": 41250.0,
         "guaranteed": 4680.0,
-        "bonus": 7229.0,
-        "surrender": 11909.0,
+        "bonus": 11937.0,
+        "surrender": 16617.0,
         "multiple": 0.1,
-        "simple_pct": -31.4,
-        "compound_pct": -61.3
+        "simple_pct": -30.6,
+        "compound_pct": -56.8
       }
     ],
     "rows_last1": [
@@ -494,12 +494,12 @@
         "age": 101,
         "paid": 206250.0,
         "guaranteed": 145000.0,
-        "bonus": 890818.0,
-        "surrender": 1035818.0,
+        "bonus": 1081748.0,
+        "surrender": 1226748.0,
         "is_age_marker": true,
-        "multiple": 5.0,
-        "simple_pct": 9.8,
-        "compound_pct": 4.0
+        "multiple": 5.9,
+        "simple_pct": 12.1,
+        "compound_pct": 4.4
       }
     ],
     "warning": null
