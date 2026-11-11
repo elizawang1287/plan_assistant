@@ -439,6 +439,71 @@
     ],
     "warning": null
   },
+  "PLP2": {
+    "product_code": "PLP2",
+    "product_name": "美好人生保险计划 II",
+    "basic": {
+      "anb_age": 53,
+      "gender": "女",
+      "smoker": "非吸烟",
+      "currency": "美元",
+      "premium_type": "年缴",
+      "annual_premium": 13750.0,
+      "pay_years": 15,
+      "total_premium": 206250.0
+    },
+    "rows_count": 34,
+    "rows_first3": [
+      {
+        "year": 1,
+        "age": 54,
+        "paid": 13750.0,
+        "guaranteed": 0.0,
+        "bonus": 0.0,
+        "surrender": 0.0,
+        "multiple": 0.0,
+        "simple_pct": -100.0,
+        "compound_pct": null
+      },
+      {
+        "year": 2,
+        "age": 55,
+        "paid": 27500.0,
+        "guaranteed": 0.0,
+        "bonus": 0.0,
+        "surrender": 0.0,
+        "multiple": 0.0,
+        "simple_pct": -50.0,
+        "compound_pct": null
+      },
+      {
+        "year": 3,
+        "age": 56,
+        "paid": 41250.0,
+        "guaranteed": 4680.0,
+        "bonus": 7229.0,
+        "surrender": 11909.0,
+        "multiple": 0.1,
+        "simple_pct": -31.4,
+        "compound_pct": -61.3
+      }
+    ],
+    "rows_last1": [
+      {
+        "year": 48,
+        "age": 101,
+        "paid": 206250.0,
+        "guaranteed": 145000.0,
+        "bonus": 890818.0,
+        "surrender": 1035818.0,
+        "is_age_marker": true,
+        "multiple": 5.0,
+        "simple_pct": 9.8,
+        "compound_pct": 4.0
+      }
+    ],
+    "warning": null
+  },
   "PLT5": {
     "product_code": "PLT5",
     "product_name": "PLT5",

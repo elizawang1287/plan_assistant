@@ -19,6 +19,7 @@ PRODUCT_NAMES = {
     "CIE3": "守护健康危疾加护保 III",
     "CIP2": "危疾首护保险计划 II",
     "ENCASH": "保诚加护一生住院现金储蓄保险",
+    "PLP2": "美好人生保险计划 II",
     "PHOR": "诚誉财富保险计划",
     "PACE": "骏誉财富保险计划",
 }
@@ -53,6 +54,8 @@ def detect_product(text):
         return "CIP2"
     if "ENCASH" in text or "加護一生住院現金" in text or "住院現金儲蓄保險" in text:
         return "ENCASH"
+    if "PLP2" in text or "美好人生保險計劃 II" in text or "美好人生保险计划 II" in text:
+        return "PLP2"
     if "PHOR" in text or "誠譽財富" in text or "诚誉财富" in text:
         return "PHOR"
     if "PACE" in text or "駿譽財富" in text or "骏誉财富" in text:
