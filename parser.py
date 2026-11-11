@@ -17,6 +17,7 @@ PRODUCT_NAMES = {
     "TRST": "保诚信守明天多元货币保险计划",
     "CIM3": "诚保一生危疾保险计划",
     "CIE3": "守护健康危疾加护保 III",
+    "CIP2": "危疾首护保险计划 II",
     "ENCASH": "保诚加护一生住院现金储蓄保险",
     "PHOR": "诚誉财富保险计划",
     "PACE": "骏誉财富保险计划",
@@ -48,6 +49,8 @@ def detect_product(text):
         return "CIE3"
     if "CIM3" in text or "誠保一生" in text:
         return "CIM3"
+    if "CIP2" in text or "危疾首護保險計劃 II" in text or "危疾首护保险计划 II" in text:
+        return "CIP2"
     if "ENCASH" in text or "加護一生住院現金" in text or "住院現金儲蓄保險" in text:
         return "ENCASH"
     if "PHOR" in text or "誠譽財富" in text or "诚誉财富" in text:
@@ -427,6 +430,57 @@ def parse_cie3(text, basic):
     return {"basic_extra": basic_extra, "rows": rows, "product_advantage": product_advantage}
 
 
+def parse_cip2(text, basic):
+    """解析 CIP2（危疾首护保险计划II）。数据行结构与 CIM3 同构，复用 parse_cim3_rows。"""
+    basic_extra = {}
+    # (CIP2) 后值顺序：投保时每年保费 | 保障年期 | 投保时保额 | 保费供款年期
+    m = re.search(r"\(CIP2\)\s*\n([\d,]+\.?\d*)\s*\n(\S+)\s*\n([\d,]+)\s*\n(\d+)\s*年", text)
+    if m:
+        basic_extra["annual_premium"] = _to_num(m.group(1))
+        basic_extra["coverage"] = m.group(2).rstrip("*")
+        basic_extra["basic_amount"] = _to_num(m.group(3))
+        basic_extra["pay_years"] = int(m.group(4))
+    # 额外定期危疾首护保II (CIPE2) 首10年赠送
+    m2 = re.search(r"\(CIPE2\)\s*\n([\d,]+)", text)
+    basic_extra["gift10"] = _to_num(m2.group(1)) if m2 else None
+    ba = basic_extra.get("basic_amount")
+    basic_extra["total_amount"] = (ba + (basic_extra.get("gift10") or 0)) if ba else None
+    ann = basic_extra.get("annual_premium")
+    yrs = basic_extra.get("pay_years")
+    basic_extra["total_premium"] = (ann * yrs) if (ann and yrs) else basic.get("total_premium")
+    basic_extra["premium_type"] = "年缴"
+
+    rows = parse_cim3_rows(text, basic.get("anb_age"), basic_extra.get("total_premium"),
+                           basic_extra.get("annual_premium"), basic_extra.get("pay_years"))
+
+    product_advantage = [
+        {
+            "title": "危疾首护，保障早期",
+            "items": [
+                "早期严重疾病保障：覆盖多种早期疾病（原位癌、原位癌等），确诊即赔20%-50%基本保额",
+                "严重疾病保障：确诊严重疾病即赔100%基本保额，并豁免后续所有保费",
+                "首10年赠送保额：额外定期危疾首护保II赠送50,000美元，首10年总保障达150%",
+            ],
+        },
+        {
+            "title": "终身保障，储蓄增值",
+            "items": [
+                "保障期至终身，退保可取回保单现金价值（连本带利）",
+                "终期红利随保单年期累积，身故/重疾保障逐年增长，抵御通胀",
+                "理赔无需发票报销，与内地社保、医保及商业保险不冲突，全球通用",
+            ],
+        },
+        {
+            "title": "灵活转换",
+            "items": [
+                "符合条件时可转换为其他危疾险或终身寿险",
+                "提供安心医国际二次诊疗服务",
+            ],
+        },
+    ]
+    return {"basic_extra": basic_extra, "rows": rows, "product_advantage": product_advantage}
+
+
 def parse_cim3_rows(text, anb_age, total_premium, annual_premium=None, pay_years=None):
     """解析 CIM3 退保价值 + 身故/严重疾病保障表。
     优先取「基本計劃補充說明」的完整逐年表；若无该页，回退到「基本計劃説明摘要」的里程碑表。
@@ -748,8 +802,13 @@ def parse_pdf(pdf_path):
     text = extract_text(pdf_path)
     product = detect_product(text)
     basic = parse_basic(text)
-    if product in ("CIM3", "CIE3"):
-        mod = parse_cim3(text, basic) if product == "CIM3" else parse_cie3(text, basic)
+    if product in ("CIM3", "CIE3", "CIP2"):
+        if product == "CIM3":
+            mod = parse_cim3(text, basic)
+        elif product == "CIE3":
+            mod = parse_cie3(text, basic)
+        else:
+            mod = parse_cip2(text, basic)
         basic.update(mod["basic_extra"])
         rows = mod["rows"]
         product_advantage = mod["product_advantage"]
