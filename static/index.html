@@ -426,6 +426,26 @@ function render(data, fname){
       </table>
     </div>`;
 
+  // PLP2专属：身故赔偿表
+  const isPlp2 = data.product_code === 'PLP2';
+  let deathSection = '';
+  if (isPlp2) {
+    const deathHtml = rows.map(r=>{
+      if (!r.death_total) return '';
+      const leverage = r.paid > 0 ? (r.death_total / r.paid).toFixed(2) + '倍' : '/';
+      return `<tr${rowCls(r)}><td>${ylab(r)}</td><td>${wU(r.paid)}</td><td>${wU(r.death_total)}</td><td>${leverage}</td></tr>`;
+    }).join('');
+    deathSection = `
+    <div class="sec">
+      <div class="sec-title">身故赔偿（含非保证）</div>
+      <div class="w-small" style="margin-bottom:8px;">首20年额外身故保障为基本保额的100%；第21-29年每年递减10%；第30年起额外保障归零。</div>
+      <table class="w-table">
+        <tr><th>保单年度</th><th>累计已缴保费（${cur}）</th><th>预计身故赔偿（${cur}）</th><th>身故赔偿杠杆</th></tr>
+        ${deathHtml}
+      </table>
+    </div>`;
+  }
+
   // 提取安排区（世誉财富PPT话术风格）—— 可对每个提取方案各渲染一段
   function wSectionHtml(v, label){
     const w = v.withdrawal;
@@ -509,6 +529,7 @@ function render(data, fname){
     </div>
     ${optSection}
     ${gSection}
+    ${deathSection}
     ${wSection}
     <div class="foot">
       <div class="src">来源：${fname}</div>

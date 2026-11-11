@@ -461,6 +461,7 @@
         "guaranteed": 0.0,
         "bonus": 0.0,
         "surrender": 0.0,
+        "death_total": 500000.0,
         "multiple": 0.0,
         "simple_pct": -100.0,
         "compound_pct": null
@@ -472,6 +473,7 @@
         "guaranteed": 0.0,
         "bonus": 0.0,
         "surrender": 0.0,
+        "death_total": 500000.0,
         "multiple": 0.0,
         "simple_pct": -50.0,
         "compound_pct": null
@@ -483,6 +485,7 @@
         "guaranteed": 4680.0,
         "bonus": 11937.0,
         "surrender": 16617.0,
+        "death_total": 513409.0,
         "multiple": 0.1,
         "simple_pct": -30.6,
         "compound_pct": -56.8

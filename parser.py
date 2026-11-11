@@ -272,6 +272,65 @@ def parse_surrender_table(text, anb_age, total_premium, product="PRMESP"):
                                    col_paid=0, col_g=col_g, col_e=col_e)
 
 
+def parse_plp2_death(text):
+    """解析PLP2身故赔偿表，返回 {year: death_total} 字典。"""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    
+    # 找身故赔偿表
+    start = None
+    for idx, ln in enumerate(lines):
+        if "身故賠償之説明摘要" in ln and "4." in ln:
+            start = idx
+            break
+    if start is None:
+        return {}
+    
+    # 截取到下一个表
+    seg = lines[start:]
+    cut = None
+    for idx, ln in enumerate(seg[1:], 1):
+        if "5." in ln or "6." in ln or "現金價值提取" in ln:
+            cut = idx
+            break
+    if cut:
+        seg = seg[:cut]
+    
+    # 解析每行：年度 + 7个数字
+    # 列顺序：年度、缴付保费、基本保额A、额外身故B、总额A+B、归原红利C、特别红利D、总额A+B+C+D
+    result = {}
+    i = 0
+    n = len(seg)
+    while i < n:
+        ln = seg[i]
+        if PLAIN_NUM.match(ln) and 1 <= int(ln) <= 101:
+            year = int(ln)
+            # 接下来的7个数字
+            vals = []
+            k = i + 1
+            while k < n and len(vals) < 7:
+                if NUM.match(seg[k]) or (VAL.match(seg[k]) and "." in seg[k]):
+                    vals.append(_to_num(seg[k]))
+                    k += 1
+                elif VAL.match(seg[k]):
+                    v = int(seg[k])
+                    if len(vals) == 0 and 1 <= v <= 101:
+                        break
+                    vals.append(float(v))
+                    k += 1
+                else:
+                    break
+            if len(vals) >= 7:
+                # 列顺序：缴付保费、基本保额A、额外身故B、总额A+B、归原红利C、总额A+B+C+D、特别红利D
+                # 第6个数字（索引5）是总额A+B+C+D（含非保证身故赔偿）
+                death_total = vals[5]
+                result[year] = death_total
+            i = k
+            continue
+        i += 1
+    
+    return result
+
+
 def _irr(annual, pay_years, surrender, yr):
     """IRR：解 Σ(k=0..p-1) annual/(1+r)^k = surrender/(1+r)^yr 求 r（返回小数）。
     无正回报（退保≤已缴保费）或无解时返回 None。"""
@@ -884,6 +943,12 @@ def parse_pdf(pdf_path):
     else:
         rows = parse_surrender_table(text, basic.get("anb_age"),
                                      basic.get("total_premium"), product=product)
+        # PLP2：合并身故赔偿表数据
+        if product == "PLP2":
+            death_map = parse_plp2_death(text)
+            for r in rows:
+                if r.get("year") in death_map:
+                    r["death_total"] = death_map[r["year"]]
         rows = [compute_metrics(r, basic.get("total_premium"),
                                 basic.get("annual_premium"), basic.get("pay_years")) for r in rows]
         withdrawal = parse_withdrawal(text, basic.get("anb_age"), product,
