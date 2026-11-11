@@ -763,10 +763,56 @@ def parse_pdf(pdf_path):
         withdrawal = None
         optimistic = {}
     elif product.startswith("PLT"):
-        # PLT定期寿险：提取保额，没有退保价值表
+        # PLT定期寿险：提取保额
         m = re.search(r"投保時保額\s*\n?\s*(?:美元\s*)?([\d,]+\.?\d*)", text)
         if m:
             basic["basic_amount"] = _to_num(m.group(1))
+        
+        # 解析续保保费表
+        premium_schedule = []
+        m_sched = re.search(r"翌年[歲岁]\s*[(（]ANB[)）]", text)
+        if m_sched:
+            tail = text[m_sched.end():m_sched.end()+5000]
+            # 找所有"X歲" + 数字的对（年龄行和保费行交替）
+            # 格式：60歲\n1,533.00
+            age_matches = list(re.finditer(r"(\d+)\s*[歲岁]\s*\n\s*([\d,]+\.\d{2})", tail))
+            for am in age_matches:
+                age = int(am.group(1))
+                premium = _to_num(am.group(2))
+                premium_schedule.append({"age": age, "annual_premium": premium})
+        
+        # 计算续保周期
+        if len(premium_schedule) >= 2:
+            first_age = premium_schedule[0]["age"]
+            second_age = premium_schedule[1]["age"]
+            renew_cycle = second_age - first_age
+            basic["renew_cycle"] = renew_cycle
+        else:
+            basic["renew_cycle"] = 1
+        
+        # 正确计算总保费（各续保期累加）
+        total_premium = 0
+        for i, node in enumerate(premium_schedule):
+            if i < len(premium_schedule) - 1:
+                # 当前节点到下一个节点之间的年数
+                years = premium_schedule[i+1]["age"] - node["age"]
+                total_premium += node["annual_premium"] * years
+            else:
+                # 最后一个节点，到保障期结束
+                # 保障年期 = pay_years - (current_age - entry_age)
+                # 简单处理：最后一个节点只算1年（或按剩余保障期）
+                entry_age = basic.get("anb_age", node["age"])
+                coverage_years = basic.get("pay_years", 0)
+                entry_to_node = node["age"] - entry_age
+                remaining_years = coverage_years - entry_to_node
+                if remaining_years > 0:
+                    total_premium += node["annual_premium"] * remaining_years
+                else:
+                    total_premium += node["annual_premium"]  # 至少算1年
+        
+        basic["total_premium"] = total_premium if premium_schedule else basic.get("total_premium")
+        basic["premium_schedule"] = premium_schedule
+        
         rows = []
         product_advantage = None
         withdrawal = None

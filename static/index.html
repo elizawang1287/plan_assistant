@@ -1006,6 +1006,29 @@ function renderPLT(data, fname){
   const fmtW = v => v==null ? '-' : '约'+Math.round(v*rate).toLocaleString();
   
   const prodLabel = data.product_name || data.product_code || 'PLT定期寿险';
+  const renewCycle = b.renew_cycle ? ('每'+b.renew_cycle+'年') : '-';
+  
+  // 续保保费明细表
+  let premiumTableHtml = '';
+  if (b.premium_schedule && b.premium_schedule.length > 0) {
+    const rows = b.premium_schedule.map((node, idx) => {
+      const entryAge = b.anb_age || node.age;
+      const policyYear = (node.age - entryAge) + 1;
+      return `<tr><td>${node.age}岁</td><td>第${policyYear}年</td><td>${fmt(node.annual_premium)}</td></tr>`;
+    }).join('');
+    premiumTableHtml = `
+      <div class="sec">
+        <div class="sec-title">续保保费明细（${b.premium_schedule.length}个保费节点）</div>
+        <table class="w-table">
+          <tr><th>投保/续保期初年龄(ANB)</th><th>保单年度起点</th><th>该续保期每年保费</th></tr>
+          ${rows}
+        </table>
+        <div class="w-small" style="margin-top:8px;color:#888;">
+          ※ 本计划书的保障及供款期为${b.pay_years||'-'}年，续保周期为${renewCycle}。以下采用原件精确金额，不推算未列年份。
+        </div>
+      </div>
+    `;
+  }
   
   card.innerHTML = `
     <div class="sec">
@@ -1015,6 +1038,7 @@ function renderPLT(data, fname){
         <tr><td>受保人</td><td>${b.anb_age||'-'}岁 ${b.gender||''}${b.smoker?('（'+b.smoker+'）'):''}</td></tr>
         <tr><td>保单货币</td><td>${cur}</td></tr>
         <tr><td>保障年期</td><td>${b.pay_years? (b.pay_years+'年') : '-'}</td></tr>
+        <tr><td>续保周期</td><td>${renewCycle}</td></tr>
       </table>
     </div>
     <div class="sec">
@@ -1022,13 +1046,14 @@ function renderPLT(data, fname){
       <table class="w-table">
         <tr><th>项目</th><th>${cur}</th><th>${curLabel}</th></tr>
         <tr><td>基本保额</td><td>${fmt(b.basic_amount)}</td><td>${fmtW(b.basic_amount)}</td></tr>
-        <tr><td>年缴保费</td><td>${fmt(b.annual_premium)}</td><td>${fmtW(b.annual_premium)}</td></tr>
+        <tr><td>首期年缴保费</td><td>${fmt(b.annual_premium)}</td><td>${fmtW(b.annual_premium)}</td></tr>
         <tr><td>总保费（总投入）</td><td>${fmt(b.total_premium)}</td><td>${fmtW(b.total_premium)}</td></tr>
       </table>
       <div class="w-small" style="margin-top:8px;color:#888;">
         ※ 定期寿险为消费型保险，无现金价值/退保价值。保费随年龄增长逐年上调。
       </div>
     </div>
+    ${premiumTableHtml}
   `;
 }
 </script>
