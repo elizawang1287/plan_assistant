@@ -762,6 +762,15 @@ def parse_pdf(pdf_path):
         product_advantage = enc["product_advantage"]
         withdrawal = None
         optimistic = {}
+    elif product.startswith("PLT"):
+        # PLT定期寿险：提取保额，没有退保价值表
+        m = re.search(r"投保時保額\s*\n?\s*(?:美元\s*)?([\d,]+\.?\d*)", text)
+        if m:
+            basic["basic_amount"] = _to_num(m.group(1))
+        rows = []
+        product_advantage = None
+        withdrawal = None
+        optimistic = {}
     else:
         rows = parse_surrender_table(text, basic.get("anb_age"),
                                      basic.get("total_premium"), product=product)
