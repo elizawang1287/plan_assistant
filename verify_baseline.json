@@ -374,6 +374,71 @@
     ],
     "warning": null
   },
+  "PRMESP": {
+    "product_code": "PRMESP",
+    "product_name": "世誉财富保险计划",
+    "basic": {
+      "anb_age": 5,
+      "gender": "男",
+      "smoker": "非吸烟",
+      "currency": "美元",
+      "premium_type": "一次整付",
+      "annual_premium": 30000.0,
+      "pay_years": 1,
+      "total_premium": 30000.0
+    },
+    "rows_count": 36,
+    "rows_first3": [
+      {
+        "year": 1,
+        "age": 6,
+        "paid": 30000.0,
+        "guaranteed": 25500.0,
+        "bonus": 0.0,
+        "surrender": 25500.0,
+        "multiple": 0.8,
+        "simple_pct": -15.0,
+        "compound_pct": -15.0
+      },
+      {
+        "year": 2,
+        "age": 7,
+        "paid": 30000.0,
+        "guaranteed": 25500.0,
+        "bonus": 0.0,
+        "surrender": 25500.0,
+        "multiple": 0.8,
+        "simple_pct": -7.5,
+        "compound_pct": -7.8
+      },
+      {
+        "year": 3,
+        "age": 8,
+        "paid": 30000.0,
+        "guaranteed": 25500.0,
+        "bonus": 1359.0,
+        "surrender": 26859.0,
+        "multiple": 0.9,
+        "simple_pct": -3.5,
+        "compound_pct": -3.6
+      }
+    ],
+    "rows_last1": [
+      {
+        "year": 96,
+        "age": 101,
+        "paid": 30000.0,
+        "guaranteed": 46620.0,
+        "bonus": 12620661.0,
+        "surrender": 12667281.0,
+        "is_age_marker": true,
+        "multiple": 422.2,
+        "simple_pct": 438.8,
+        "compound_pct": 6.5
+      }
+    ],
+    "warning": null
+  },
   "PLT5": {
     "product_code": "PLT5",
     "product_name": "PLT5",

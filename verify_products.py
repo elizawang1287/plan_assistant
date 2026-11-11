@@ -17,6 +17,7 @@ TEST_PDFS = [
     ("CIP2", r"C:\Users\user\Documents\working\working\家庭规划书\1993年男\M_34_NS_CIP2_20_100000_20261103.pdf"),
     ("TRST", r"C:\Users\user\Documents\working\working\家庭规划书\F_33_NS_TRST_5_31000_20261106.pdf"),
     ("ENCASH", r"C:\Users\user\Documents\working\working\家庭规划书\53岁女\M_54_NS_ENCASH_15_250000_20261102.pdf"),
+    ("PRMESP", r"C:\Users\user\Documents\working\working\家庭规划书\家庭2\M_5_NS_PRMESP_1_30000_11000_20260930.pdf"),
     ("PLT5", r"C:\Users\user\Documents\working\working\家庭规划书\李总\M_50_NS_PLT5_36_300000_20261106.pdf"),
 ]
 
