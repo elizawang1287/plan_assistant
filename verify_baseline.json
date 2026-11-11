@@ -1,0 +1,431 @@
+{
+  "CIM3": {
+    "product_code": "CIM3",
+    "product_name": "诚保一生危疾保险计划",
+    "basic": {
+      "anb_age": 34,
+      "gender": "男",
+      "smoker": "非吸烟",
+      "currency": "美元",
+      "premium_type": "年缴",
+      "annual_premium": 3613.0,
+      "pay_years": 20,
+      "total_premium": 72260.0,
+      "coverage": "終身",
+      "basic_amount": 100000.0,
+      "gift10": 50000.0,
+      "total_amount": 150000.0
+    },
+    "rows_count": 30,
+    "rows_first3": [
+      {
+        "year": 1,
+        "age": 35,
+        "is_age_marker": false,
+        "paid": 3613.0,
+        "guaranteed_surr": 0.0,
+        "bonus_surr": 0.0,
+        "surrender": 0.0,
+        "death_total": 150000.0,
+        "multiple": 0.0,
+        "simple_pct": -100.0,
+        "compound_pct": null
+      },
+      {
+        "year": 2,
+        "age": 36,
+        "is_age_marker": false,
+        "paid": 7226.0,
+        "guaranteed_surr": 0.0,
+        "bonus_surr": 0.0,
+        "surrender": 0.0,
+        "death_total": 150000.0,
+        "multiple": 0.0,
+        "simple_pct": -50.0,
+        "compound_pct": null
+      },
+      {
+        "year": 3,
+        "age": 37,
+        "is_age_marker": false,
+        "paid": 10839.0,
+        "guaranteed_surr": 154.0,
+        "bonus_surr": 0.0,
+        "surrender": 154.0,
+        "death_total": 150000.0,
+        "multiple": 0.0,
+        "simple_pct": -33.3,
+        "compound_pct": -87.1
+      }
+    ],
+    "rows_last1": [
+      {
+        "year": 67,
+        "age": 101,
+        "is_age_marker": true,
+        "paid": 72260.0,
+        "guaranteed_surr": 100000.0,
+        "bonus_surr": 1423122.0,
+        "surrender": 1523122.0,
+        "death_total": 1523122.0,
+        "multiple": 21.1,
+        "simple_pct": 34.9,
+        "compound_pct": 5.4
+      }
+    ],
+    "warning": null
+  },
+  "CIE3": {
+    "product_code": "CIE3",
+    "product_name": "守护健康危疾加护保 III",
+    "basic": {
+      "anb_age": 54,
+      "gender": "男",
+      "smoker": "非吸烟",
+      "currency": "美元",
+      "premium_type": "年缴",
+      "annual_premium": 20002.5,
+      "pay_years": 15,
+      "total_premium": 300037.5,
+      "coverage": "終身",
+      "basic_amount": 250000.0,
+      "gift10": 125000.0,
+      "total_amount": 375000.0
+    },
+    "rows_count": 28,
+    "rows_first3": [
+      {
+        "year": 1,
+        "age": 55,
+        "is_age_marker": false,
+        "paid": 20003.0,
+        "guaranteed_surr": 0.0,
+        "bonus_surr": 0.0,
+        "surrender": 0.0,
+        "death_total": 375000.0,
+        "multiple": 0.0,
+        "simple_pct": -100.0,
+        "compound_pct": null
+      },
+      {
+        "year": 2,
+        "age": 56,
+        "is_age_marker": false,
+        "paid": 40005.0,
+        "guaranteed_surr": 0.0,
+        "bonus_surr": 0.0,
+        "surrender": 0.0,
+        "death_total": 375000.0,
+        "multiple": 0.0,
+        "simple_pct": -50.0,
+        "compound_pct": null
+      },
+      {
+        "year": 3,
+        "age": 57,
+        "is_age_marker": false,
+        "paid": 60008.0,
+        "guaranteed_surr": 1662.0,
+        "bonus_surr": 0.0,
+        "surrender": 1662.0,
+        "death_total": 375000.0,
+        "multiple": 0.0,
+        "simple_pct": -33.1,
+        "compound_pct": -82.3
+      }
+    ],
+    "rows_last1": [
+      {
+        "year": 47,
+        "age": 101,
+        "is_age_marker": true,
+        "paid": 300038.0,
+        "guaranteed_surr": 250000.0,
+        "bonus_surr": 1596470.0,
+        "surrender": 1846470.0,
+        "death_total": 1846470.0,
+        "multiple": 6.2,
+        "simple_pct": 12.9,
+        "compound_pct": 4.6
+      }
+    ],
+    "warning": null
+  },
+  "CIP2": {
+    "product_code": "CIP2",
+    "product_name": "危疾首护保险计划 II",
+    "basic": {
+      "anb_age": 34,
+      "gender": "男",
+      "smoker": "非吸烟",
+      "currency": "美元",
+      "premium_type": "年缴",
+      "annual_premium": 2335.0,
+      "pay_years": 20,
+      "total_premium": 46700.0,
+      "coverage": "終身",
+      "basic_amount": 100000.0,
+      "gift10": 50000.0,
+      "total_amount": 150000.0
+    },
+    "rows_count": 67,
+    "rows_first3": [
+      {
+        "year": 1,
+        "age": 35,
+        "is_age_marker": false,
+        "paid": 2335.0,
+        "guaranteed_surr": 0.0,
+        "bonus_surr": 0.0,
+        "surrender": 0.0,
+        "death_total": 150000.0,
+        "multiple": 0.0,
+        "simple_pct": -100.0,
+        "compound_pct": null
+      },
+      {
+        "year": 2,
+        "age": 36,
+        "is_age_marker": false,
+        "paid": 4670.0,
+        "guaranteed_surr": 0.0,
+        "bonus_surr": 0.0,
+        "surrender": 0.0,
+        "death_total": 150000.0,
+        "multiple": 0.0,
+        "simple_pct": -50.0,
+        "compound_pct": null
+      },
+      {
+        "year": 3,
+        "age": 37,
+        "is_age_marker": false,
+        "paid": 7005.0,
+        "guaranteed_surr": 93.0,
+        "bonus_surr": 0.0,
+        "surrender": 93.0,
+        "death_total": 150000.0,
+        "multiple": 0.0,
+        "simple_pct": -33.3,
+        "compound_pct": -87.4
+      }
+    ],
+    "rows_last1": [
+      {
+        "year": 67,
+        "age": 101,
+        "is_age_marker": false,
+        "paid": 46700.0,
+        "guaranteed_surr": 100000.0,
+        "bonus_surr": 572048.0,
+        "surrender": 672048.0,
+        "death_total": 672048.0,
+        "multiple": 14.4,
+        "simple_pct": 23.3,
+        "compound_pct": 4.7
+      }
+    ],
+    "warning": null
+  },
+  "TRST": {
+    "product_code": "TRST",
+    "product_name": "保诚信守明天多元货币保险计划",
+    "basic": {
+      "anb_age": 33,
+      "gender": "女",
+      "smoker": "非吸烟",
+      "currency": "美元",
+      "premium_type": "年缴",
+      "annual_premium": 6200.0,
+      "pay_years": 5,
+      "total_premium": 31000.0
+    },
+    "rows_count": 35,
+    "rows_first3": [
+      {
+        "year": 1,
+        "age": 34,
+        "paid": 6200.0,
+        "guaranteed": 0.0,
+        "bonus": 0.0,
+        "surrender": 0.0,
+        "multiple": 0.0,
+        "simple_pct": -100.0,
+        "compound_pct": null
+      },
+      {
+        "year": 2,
+        "age": 35,
+        "paid": 12400.0,
+        "guaranteed": 0.0,
+        "bonus": 0.0,
+        "surrender": 0.0,
+        "multiple": 0.0,
+        "simple_pct": -50.0,
+        "compound_pct": null
+      },
+      {
+        "year": 3,
+        "age": 36,
+        "paid": 18600.0,
+        "guaranteed": 3671.0,
+        "bonus": 4044.0,
+        "surrender": 7715.0,
+        "multiple": 0.2,
+        "simple_pct": -25.0,
+        "compound_pct": -37.1
+      }
+    ],
+    "rows_last1": [
+      {
+        "year": 68,
+        "age": 101,
+        "paid": 31000.0,
+        "guaranteed": 39552.0,
+        "bonus": 1947024.0,
+        "surrender": 1986576.0,
+        "is_age_marker": true,
+        "multiple": 64.1,
+        "simple_pct": 95.6,
+        "compound_pct": 6.5
+      }
+    ],
+    "warning": null
+  },
+  "ENCASH": {
+    "product_code": "ENCASH",
+    "product_name": "保诚加护一生住院现金储蓄保险",
+    "basic": {
+      "anb_age": 54,
+      "gender": "男",
+      "smoker": "非吸烟",
+      "currency": "美元",
+      "premium_type": "年缴",
+      "annual_premium": 12572.5,
+      "pay_years": 15,
+      "total_premium": 188588.0,
+      "basic_amount": 250000.0,
+      "coverage": "終身"
+    },
+    "rows_count": 28,
+    "rows_first3": [
+      {
+        "year": 1,
+        "age": 55,
+        "is_age_marker": false,
+        "paid": 12573.0,
+        "surr_guaranteed": 0.0,
+        "surr_bonus": 0.0,
+        "surrender": 0.0,
+        "death_guaranteed": 250000.0,
+        "death_bonus": 0.0,
+        "death_total": 250000.0,
+        "multiple": 0.0,
+        "simple_pct": -100.0,
+        "compound_pct": null
+      },
+      {
+        "year": 2,
+        "age": 56,
+        "is_age_marker": false,
+        "paid": 25145.0,
+        "surr_guaranteed": 0.0,
+        "surr_bonus": 0.0,
+        "surrender": 0.0,
+        "death_guaranteed": 250000.0,
+        "death_bonus": 0.0,
+        "death_total": 250000.0,
+        "multiple": 0.0,
+        "simple_pct": -50.0,
+        "compound_pct": null
+      },
+      {
+        "year": 3,
+        "age": 57,
+        "is_age_marker": false,
+        "paid": 37718.0,
+        "surr_guaranteed": 1018.0,
+        "surr_bonus": 0.0,
+        "surrender": 1018.0,
+        "death_guaranteed": 250000.0,
+        "death_bonus": 0.0,
+        "death_total": 250000.0,
+        "multiple": 0.0,
+        "simple_pct": -33.2,
+        "compound_pct": -82.5
+      }
+    ],
+    "rows_last1": [
+      {
+        "year": 47,
+        "age": 101,
+        "is_age_marker": true,
+        "paid": 188588.0,
+        "surr_guaranteed": 250000.0,
+        "surr_bonus": 1102790.0,
+        "surrender": 1352790.0,
+        "death_guaranteed": 250000.0,
+        "death_bonus": 1102790.0,
+        "death_total": 1352790.0,
+        "multiple": 7.2,
+        "simple_pct": 15.4,
+        "compound_pct": 5.0
+      }
+    ],
+    "warning": null
+  },
+  "PLT5": {
+    "product_code": "PLT5",
+    "product_name": "PLT5",
+    "basic": {
+      "anb_age": 50,
+      "gender": "男",
+      "smoker": "非吸烟",
+      "currency": "美元",
+      "premium_type": "年缴",
+      "annual_premium": 996.0,
+      "pay_years": 36,
+      "total_premium": 370632.0,
+      "basic_amount": 300000.0,
+      "renew_cycle": 5,
+      "premium_schedule": [
+        {
+          "age": 50,
+          "annual_premium": 996.0
+        },
+        {
+          "age": 55,
+          "annual_premium": 1584.0
+        },
+        {
+          "age": 60,
+          "annual_premium": 2628.0
+        },
+        {
+          "age": 65,
+          "annual_premium": 4284.0
+        },
+        {
+          "age": 70,
+          "annual_premium": 8376.0
+        },
+        {
+          "age": 75,
+          "annual_premium": 16092.0
+        },
+        {
+          "age": 80,
+          "annual_premium": 31128.0
+        },
+        {
+          "age": 85,
+          "annual_premium": 45192.0
+        }
+      ]
+    },
+    "rows_count": 0,
+    "rows_first3": [],
+    "rows_last1": [],
+    "warning": null
+  }
+}
