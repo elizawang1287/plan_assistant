@@ -111,7 +111,7 @@
   <div class="drop" id="drop">
     <div style="font-size:30px;">⬆</div>
     <div><b>点击添加</b> 或拖入计划书 PDF（可一份份加）</div>
-    <div class="hint">支持 世誉财富PRMESP / 信守明天TRST / 加护一生ENCASH / 美好人生PLP2 / 危疾CIM3·CIE3·CIP2 / 定期寿险PLT系列 · 数字版 PDF</div>
+    <div class="hint">支持 世誉财富PRMESP / 信守明天TRST / 加护一生ENCASH / 美好人生PLP2 / 自主未来LFRE2 / 危疾CIM3·CIE3·CIP2 / 定期寿险PLT系列 · 数字版 PDF</div>
     <button class="btn btn-primary" id="btnAdd" style="margin-top:12px;">＋ 添加PDF</button>
   </div>
   <input type="file" id="file" accept=".pdf" multiple hidden>
@@ -429,10 +429,14 @@ function render(data, fname){
       </table>
     </div>`;
 
-  // PLP2专属：身故赔偿表
+  // PLP2/LFRE2专属：身故赔偿表
   const isPlp2 = data.product_code === 'PLP2';
+  const isLfre2 = data.product_code === 'LFRE2';
   let deathSection = '';
-  if (isPlp2) {
+  if (isPlp2 || isLfre2) {
+    const deathDesc = isPlp2
+      ? '首20年额外身故保障为基本保额的100%；第21-29年每年递减10%；第30年起额外保障归零。'
+      : '保证身故保障终身，另加非保证终期红利。';
     const deathHtml = rows.map(r=>{
       if (!r.death_total) return '';
       const leverage = r.paid > 0 ? (r.death_total / r.paid).toFixed(2) + '倍' : '/';
@@ -441,7 +445,7 @@ function render(data, fname){
     deathSection = `
     <div class="sec">
       <div class="sec-title">身故赔偿（含非保证）</div>
-      <div class="w-small" style="margin-bottom:8px;">首20年额外身故保障为基本保额的100%；第21-29年每年递减10%；第30年起额外保障归零。</div>
+      <div class="w-small" style="margin-bottom:8px;">${deathDesc}</div>
       <table class="w-table">
         <tr><th>保单年度</th><th>累计已缴保费（${cur}）</th><th>预计身故赔偿（${cur}）</th><th>身故赔偿杠杆</th></tr>
         ${deathHtml}

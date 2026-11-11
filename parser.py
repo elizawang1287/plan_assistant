@@ -20,6 +20,7 @@ PRODUCT_NAMES = {
     "CIP2": "危疾首护保险计划 II",
     "ENCASH": "保诚加护一生住院现金储蓄保险",
     "PLP2": "美好人生保险计划 II",
+    "LFRE2": "自主未来保险计划 II",
     "PHOR": "诚誉财富保险计划",
     "PACE": "骏誉财富保险计划",
 }
@@ -56,6 +57,8 @@ def detect_product(text):
         return "ENCASH"
     if "PLP2" in text or "美好人生保險計劃 II" in text or "美好人生保险计划 II" in text:
         return "PLP2"
+    if "LFRE2" in text or "自主未來" in text or "自主未来" in text:
+        return "LFRE2"
     if "PHOR" in text or "誠譽財富" in text or "诚誉财富" in text:
         return "PHOR"
     if "PACE" in text or "駿譽財富" in text or "骏誉财富" in text:
@@ -211,8 +214,9 @@ def parse_surrender_table(text, anb_age, total_premium, product="PRMESP"):
     """
     is_trst = product in ("TRST", "PACE")
     is_plp2 = product == "PLP2"
-    n_cols = 5 if (is_trst or is_plp2) else 4
-    col_e = 4 if is_plp2 else 3  # PLP2的surrender在第4列（最后一列）
+    is_lfre2 = product == "LFRE2"
+    n_cols = 5 if is_plp2 else (4 if is_lfre2 else (5 if is_trst else 4))
+    col_e = 4 if is_plp2 else (3 if is_lfre2 else 3)  # PLP2的surrender在第4列（最后一列），LFRE2在第3列（最后一列）
 
     def detect_trst_col_g(seg):
         """TRST列序：基础表 paid,A,B,surr,C；补充表 paid,B,C,surr,A。
@@ -323,6 +327,65 @@ def parse_plp2_death(text):
                 # 列顺序：缴付保费、基本保额A、额外身故B、总额A+B、归原红利C、总额A+B+C+D、特别红利D
                 # 第6个数字（索引5）是总额A+B+C+D（含非保证身故赔偿）
                 death_total = vals[5]
+                result[year] = death_total
+            i = k
+            continue
+        i += 1
+    
+    return result
+
+
+def parse_lfre2_death(text):
+    """解析LFRE2身故赔偿表，返回 {year: death_total} 字典。
+    LFRE2是5列：年度、缴付保费、保证金额A、非保证终期红利B、身故赔偿总额A+B"""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    
+    # 找身故赔偿表
+    start = None
+    for idx, ln in enumerate(lines):
+        if "身故賠償之説明摘要" in ln and "4." in ln:
+            start = idx
+            break
+    if start is None:
+        return {}
+    
+    # 截取到下一个表
+    seg = lines[start:]
+    cut = None
+    for idx, ln in enumerate(seg[1:], 1):
+        if "5." in ln or "6." in ln or "現金價值提取" in ln:
+            cut = idx
+            break
+    if cut:
+        seg = seg[:cut]
+    
+    # 解析每行：年度 + 4个数字
+    result = {}
+    i = 0
+    n = len(seg)
+    while i < n:
+        ln = seg[i]
+        if PLAIN_NUM.match(ln) and 1 <= int(ln) <= 101:
+            year = int(ln)
+            # 接下来的4个数字
+            vals = []
+            k = i + 1
+            while k < n and len(vals) < 4:
+                if NUM.match(seg[k]) or (VAL.match(seg[k]) and "." in seg[k]):
+                    vals.append(_to_num(seg[k]))
+                    k += 1
+                elif VAL.match(seg[k]):
+                    v = int(seg[k])
+                    if len(vals) == 0 and 1 <= v <= 101:
+                        break
+                    vals.append(float(v))
+                    k += 1
+                else:
+                    break
+            if len(vals) >= 4:
+                # 列顺序：缴付保费、保证金额A、非保证终期红利B、身故赔偿总额A+B
+                # 第4个数字（索引3）是身故赔偿总额
+                death_total = vals[3]
                 result[year] = death_total
             i = k
             continue
@@ -943,9 +1006,14 @@ def parse_pdf(pdf_path):
     else:
         rows = parse_surrender_table(text, basic.get("anb_age"),
                                      basic.get("total_premium"), product=product)
-        # PLP2：合并身故赔偿表数据
+        # PLP2/LFRE2：合并身故赔偿表数据
         if product == "PLP2":
             death_map = parse_plp2_death(text)
+            for r in rows:
+                if r.get("year") in death_map:
+                    r["death_total"] = death_map[r["year"]]
+        elif product == "LFRE2":
+            death_map = parse_lfre2_death(text)
             for r in rows:
                 if r.get("year") in death_map:
                     r["death_total"] = death_map[r["year"]]

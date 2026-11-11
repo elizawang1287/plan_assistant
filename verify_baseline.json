@@ -507,6 +507,74 @@
     ],
     "warning": null
   },
+  "LFRE2": {
+    "product_code": "LFRE2",
+    "product_name": "自主未来保险计划 II",
+    "basic": {
+      "anb_age": 53,
+      "gender": "女",
+      "smoker": "非吸烟",
+      "currency": "美元",
+      "premium_type": "年缴",
+      "annual_premium": 13545.0,
+      "pay_years": 10,
+      "total_premium": 135450.0
+    },
+    "rows_count": 31,
+    "rows_first3": [
+      {
+        "year": 1,
+        "age": 54,
+        "paid": 13545.0,
+        "guaranteed": 0.0,
+        "bonus": 0.0,
+        "surrender": 0.0,
+        "death_total": 250000.0,
+        "multiple": 0.0,
+        "simple_pct": -100.0,
+        "compound_pct": null
+      },
+      {
+        "year": 2,
+        "age": 55,
+        "paid": 27090.0,
+        "guaranteed": 0.0,
+        "bonus": 0.0,
+        "surrender": 0.0,
+        "death_total": 250000.0,
+        "multiple": 0.0,
+        "simple_pct": -50.0,
+        "compound_pct": null
+      },
+      {
+        "year": 3,
+        "age": 56,
+        "paid": 40635.0,
+        "guaranteed": 1712.0,
+        "bonus": 0.0,
+        "surrender": 1712.0,
+        "death_total": 250000.0,
+        "multiple": 0.0,
+        "simple_pct": -32.9,
+        "compound_pct": -76.7
+      }
+    ],
+    "rows_last1": [
+      {
+        "year": 48,
+        "age": 101,
+        "paid": 135450.0,
+        "guaranteed": 250000.0,
+        "bonus": 1500003.0,
+        "surrender": 1750003.0,
+        "is_age_marker": true,
+        "multiple": 12.9,
+        "simple_pct": 27.4,
+        "compound_pct": 6.0
+      }
+    ],
+    "warning": null
+  },
   "PLT5": {
     "product_code": "PLT5",
     "product_name": "PLT5",
