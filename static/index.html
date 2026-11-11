@@ -571,7 +571,8 @@ function renderCIM3(data, fname){
   $('#toolbar').style.display='flex';
   const b = data.basic;
   const cur = b.currency || '美元';
-  const isSimple = data.product_code === 'CIE3' || data.product_code === 'CIP2';
+  const isCie3 = data.product_code === 'CIE3';
+  const isCip2 = data.product_code === 'CIP2';
   const rate = parseFloat($('#rate').value) || 6.8;
   const curLabel = document.querySelector('input[name="cur"]:checked').value === 'HKD' ? '港币' : '人民币';
   // 行选择与标签：完整逐年表（有补充说明）→ 每5年+末行，全部按「第X年」；
@@ -609,7 +610,7 @@ function renderCIM3(data, fname){
   const giftText = `${wU(b.basic_amount)}×9次`;
   const annuityText = Math.round((data.basic.basic_amount || 0) * 0.06).toLocaleString() + '/年';
   const lifeText = `${wU(b.basic_amount)}美元`;
-  const protHtml = (isSimple
+  const protHtml = (isCie3 || isCip2
     ? rows.map(r => `
     <tr${rowCls(r)}>
       <td>${ylab(r)}</td>
@@ -658,7 +659,16 @@ function renderCIM3(data, fname){
   // 保障明细表（参考图2：保障内容 | 人民币 | 美元），按保障类型分组
   const _b = data.basic;
   const _G = _b.basic_amount || 0;
-  const benG = isSimple ? [
+  const benG = isCip2 ? [
+    {g:"危疾保障", rows:[
+      {c:"第一次严重疾病理赔", n:"覆盖多种严重疾病；首10年含额外定期危疾首护保II，总保障150%（基本保额＋赠送保额）", v:(_G+(_b.gift10||0))},
+      {c:"早期严重疾病保障", n:"确诊早期严重疾病即可赔付，提前获得经济支持", v:_G*0.25},
+    ]},
+    {g:"保费与退保", rows:[
+      {c:"保费豁免", n:"确诊严重疾病后，豁免日后所有保费", v:null},
+      {c:"退保提取", n:"连本带利取回保单现金价值（见退保价值表）", v:null},
+    ]},
+  ] : isCie3 ? [
     {g:"危疾保障", rows:[
       {c:"第一次严重疾病理赔", n:"覆盖56种严重疾病；首10年含额外危疾加护保III，总保障150%（基本保额＋赠送保额＋红利）", v:(_G+(_b.gift10||0))},
       {c:"严重疾病延伸保障", n:"癌症额外2次、心脏病/中风额外2次，每次赔付100%保额", v:_G*2},
@@ -709,11 +719,13 @@ function renderCIM3(data, fname){
     </div>
     <div class="sec">
       <div class="sec-title">基本保障</div>
-      <div class="w-small" style="margin-bottom:8px;">${isSimple
+      <div class="w-small" style="margin-bottom:8px;">${isCip2
+        ? '*首10年含额外定期危疾首护保II，总保障150%（基本保额＋赠送保额）；确诊严重疾病后豁免日后所有保费。'
+        : isCie3
         ? '*严重疾病延伸保障：癌症额外2次、心脏病/中风额外2次，每次100%保额；癌症治疗保障60%；首10年含额外危疾加护保III。'
         : '*再次重疾保障每次100%基本保额、最多9次；严重脑退化症及帕金森病终身年金每年基本保额6%；人寿延伸保障100,000美元（严重疾病理赔后、86岁前身故）。'}</div>
       <table class="w-table">
-        ${isSimple
+        ${(isCip2 || isCie3)
           ? `<tr><th>保单年度</th><th>已缴保费</th><th>身故或严重疾病保障</th><th>退保价值</th></tr>`
           : `<tr><th>保单年度</th><th>已缴保费</th><th>首次重疾或身故</th><th>再次重疾(×9)</th><th>严重脑退化及帕金森年金</th><th>人寿延伸保障</th><th>退保价值</th></tr>`}
         ${protHtml}
