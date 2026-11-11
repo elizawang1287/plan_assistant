@@ -493,12 +493,29 @@ function render() {
 
     // 退保价值对比表
     html += '<div class="group-section"><div class="group-title">退保价值对比（正常预期）</div>';
-    // 收集所有年度
-    const allYears = new Set();
+    // 收集所有关键节点：每5年 + 年龄标记行
+    const keyRows = [];
+    const seenYears = new Set();
+    // 先加每5年的
     detailData.forEach(p => {
-      (p.rows||[]).forEach(r => allYears.add(r.year));
+      (p.rows||[]).forEach(r => {
+        if ((r.year % 5 === 0 || r.year === 1) && !seenYears.has(r.year)) {
+          keyRows.push(r);
+          seenYears.add(r.year);
+        }
+      });
     });
-    const years = Array.from(allYears).sort((a,b)=>a-b).filter(y => y % 5 === 0 || y === 1);
+    // 再加年龄标记行
+    detailData.forEach(p => {
+      (p.rows||[]).forEach(r => {
+        if (r.is_age_marker && !seenYears.has(r.year)) {
+          keyRows.push(r);
+          seenYears.add(r.year);
+        }
+      });
+    });
+    // 按年度排序
+    keyRows.sort((a,b) => a.year - b.year);
     // 两行表头：第一行产品名+保费（合并两列），第二行USD/RMB
     // 生成表头产品名：产品简称 + 年缴保费
     const prodLabels = detailData.map(p => {
@@ -527,10 +544,11 @@ function render() {
     });
     html += '</tr></thead><tbody>';
     const { rate: currRate } = getCurr();
-    years.forEach(y => {
-      html += `<tr><td style="font-weight:700;border:1px solid #ccc;padding:6px;text-align:center">第${y}年</td>`;
+    keyRows.forEach(r0 => {
+      const yearLabel = r0.is_age_marker ? `${r0.age}岁（第${r0.year}年）` : `第${r0.year}年`;
+      html += `<tr><td style="font-weight:700;border:1px solid #ccc;padding:6px;text-align:center">${yearLabel}</td>`;
       detailData.forEach(p => {
-        const row = (p.rows||[]).find(r => r.year === y);
+        const row = (p.rows||[]).find(r => r.year === r0.year);
         const sv = row ? row.surrender : null;
         const svStr = sv ? (sv/10000).toFixed(1) + '万' : '—';
         const svCurrStr = sv ? (sv*currRate/10000).toFixed(1) + '万' : '—';
@@ -557,10 +575,11 @@ function render() {
       html += '<th style="border:1px solid #ccc;padding:6px;background:var(--pr);color:#fff;font-weight:600">非保证收益</th>';
     });
     html += '</tr></thead><tbody>';
-    years.forEach(y => {
-      html += `<tr><td style="font-weight:700;border:1px solid #ccc;padding:6px;text-align:center">第${y}年</td>`;
+    keyRows.forEach(r0 => {
+      const yearLabel = r0.is_age_marker ? `${r0.age}岁（第${r0.year}年）` : `第${r0.year}年`;
+      html += `<tr><td style="font-weight:700;border:1px solid #ccc;padding:6px;text-align:center">${yearLabel}</td>`;
       detailData.forEach(p => {
-        const row = (p.rows||[]).find(r => r.year === y);
+        const row = (p.rows||[]).find(r => r.year === r0.year);
         const g = row ? (row.guaranteed || 0) : 0;
         const ng = row ? ((row.surrender || 0) - (row.guaranteed || 0)) : 0;
         const gStr = g ? (g/10000).toFixed(1) + '万' : '—';
