@@ -29,7 +29,7 @@ BE_TEXT = RGBColor(0x0F, 0x7A, 0x3D)   # 预期回本行文字（深绿）
 
 
 # 各产品在「每5年」基准之外额外展示的年份：信守明天加第8年、世誉财富加第4年
-EXTRA_ROWS_YEARS = {"TRST": {8}, "PRMESP": {4}}
+EXTRA_ROWS_YEARS = {"TRST": {8}, "PRMESP": {4}, "CIM3": {1}, "CIE3": {1}, "CIP2": {1}}
 # 预期回本年份（该年度退保价值达到已缴保费）：表格中整行绿色高亮 + 年度后标 ★
 BREAKEVEN_YEARS = {"TRST": 8, "PRMESP": 4}
 
