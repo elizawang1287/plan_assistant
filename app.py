@@ -382,8 +382,11 @@ async def family_export_ppt(payload: dict = None):
         currency = (payload or {}).get("currency", "HKD")  # HKD 或 RMB
 
         prs = Presentation()
-        prs.slide_width = Inches(13.333)
-        prs.slide_height = Inches(7.5)
+        # A4竖版：宽8.27英寸，高11.69英寸
+        prs.slide_width = Inches(8.27)
+        prs.slide_height = Inches(11.69)
+
+        FONT_NAME = "微软雅黑"
 
         RED = RGBColor(0xB5, 0x00, 0x00)
         DARK = RGBColor(0x1F, 0x24, 0x30)
@@ -397,17 +400,19 @@ async def family_export_ppt(payload: dict = None):
             bg.fill.solid()
             bg.fill.fore_color.rgb = RED
             bg.line.fill.background()
-            txBox = slide.shapes.add_textbox(Inches(1), Inches(2.5), Inches(11), Inches(2))
+            txBox = slide.shapes.add_textbox(Inches(0.5), Inches(4), Inches(7), Inches(2))
             tf = txBox.text_frame
             p = tf.paragraphs[0]
             p.text = title
-            p.font.size = Pt(40)
+            p.font.name = FONT_NAME
+            p.font.size = Pt(36)
             p.font.bold = True
             p.font.color.rgb = WHITE
             if subtitle:
                 p2 = tf.add_paragraph()
                 p2.text = subtitle
-                p2.font.size = Pt(18)
+                p2.font.name = FONT_NAME
+                p2.font.size = Pt(16)
                 p2.font.color.rgb = RGBColor(0xFF, 0xDD, 0xDD)
             return slide
 
@@ -517,17 +522,18 @@ async def family_export_ppt(payload: dict = None):
             slide = prs.slides.add_slide(prs.slide_layouts[6])
 
             # 标题
-            txBox = slide.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(12), Inches(0.6))
+            txBox = slide.shapes.add_textbox(Inches(0.4), Inches(0.3), Inches(7.5), Inches(0.6))
             p = txBox.text_frame.paragraphs[0]
             p.text = f"{cat} 对比"
-            p.font.size = Pt(24)
+            p.font.name = FONT_NAME
+            p.font.size = Pt(20)
             p.font.bold = True
             p.font.color.rgb = RED
 
             left = Inches(0.3)
-            top = Inches(1.1)
-            width = Inches(12.7)
-            height = Inches(0.5 * total_rows)
+            top = Inches(1.0)
+            width = Inches(7.7)
+            height = Inches(0.4 * total_rows)
             table_shape = slide.shapes.add_table(total_rows, ncols, left, top, width, height)
             table = table_shape.table
             # 彻底删除表格默认样式（隔行变色、首列高亮）
@@ -538,23 +544,23 @@ async def family_export_ppt(payload: dict = None):
 
             # 列宽
             if currency == "RMB":
-                table.columns[0].width = Inches(1.3)
-                table.columns[1].width = Inches(2.5)
-                table.columns[2].width = Inches(1.7)
-                table.columns[3].width = Inches(1.6)
-                table.columns[4].width = Inches(1.8)
-                table.columns[5].width = Inches(1.8)
-                table.columns[6].width = Inches(1.0)
+                table.columns[0].width = Inches(0.9)
+                table.columns[1].width = Inches(1.6)
+                table.columns[2].width = Inches(1.1)
+                table.columns[3].width = Inches(1.1)
+                table.columns[4].width = Inches(1.1)
+                table.columns[5].width = Inches(1.2)
+                table.columns[6].width = Inches(0.7)
                 headers = ["家庭成员", "产品", "总保额(USD)", "前十年赠送(USD)", "年保费(USD)", f"年保费({currency})", "供款期"]
             else:
-                table.columns[0].width = Inches(1.2)
-                table.columns[1].width = Inches(2.2)
-                table.columns[2].width = Inches(1.5)
-                table.columns[3].width = Inches(1.5)
-                table.columns[4].width = Inches(1.4)
-                table.columns[5].width = Inches(1.6)
-                table.columns[6].width = Inches(1.6)
-                table.columns[7].width = Inches(0.9)
+                table.columns[0].width = Inches(0.8)
+                table.columns[1].width = Inches(1.4)
+                table.columns[2].width = Inches(0.9)
+                table.columns[3].width = Inches(0.9)
+                table.columns[4].width = Inches(0.9)
+                table.columns[5].width = Inches(1.0)
+                table.columns[6].width = Inches(1.0)
+                table.columns[7].width = Inches(0.6)
                 headers = ["家庭成员", "产品", "总保额(USD)", "总保额(HKD)", "前十年赠送(USD)", "年保费(USD)", "年保费(HKD)", "供款期"]
             for ci, h in enumerate(headers):
                 cell = table.cell(0, ci)
@@ -562,7 +568,8 @@ async def family_export_ppt(payload: dict = None):
                 cell.fill.solid()
                 cell.fill.fore_color.rgb = RED
                 for para in cell.text_frame.paragraphs:
-                    para.font.size = Pt(10)
+                    para.font.name = FONT_NAME
+                    para.font.size = Pt(9)
                     para.font.bold = True
                     para.font.color.rgb = WHITE
                     para.alignment = PP_ALIGN.CENTER
@@ -600,7 +607,8 @@ async def family_export_ppt(payload: dict = None):
                         cell.fill.solid()
                         cell.fill.fore_color.rgb = WHITE
                         for para in cell.text_frame.paragraphs:
-                            para.font.size = Pt(9)
+                            para.font.name = FONT_NAME
+                            para.font.size = Pt(8)
                             para.font.color.rgb = DARK
                             para.alignment = PP_ALIGN.CENTER if ci != 1 else PP_ALIGN.LEFT
 
@@ -608,7 +616,8 @@ async def family_export_ppt(payload: dict = None):
                     if idx == 0:
                         table.cell(ri, 0).text = person
                         for para in table.cell(ri, 0).text_frame.paragraphs:
-                            para.font.size = Pt(10)
+                            para.font.name = FONT_NAME
+                            para.font.size = Pt(9)
                             para.font.bold = True
                             para.font.color.rgb = DARK
                             para.alignment = PP_ALIGN.CENTER
