@@ -379,6 +379,7 @@ async def family_export_ppt(payload: dict = None):
         policies = (payload or {}).get("policies", [])
         usd_hkd = float((payload or {}).get("usd_hkd", 7.8))
         usd_rmb = float((payload or {}).get("usd_rmb", 7.2))
+        currency = (payload or {}).get("currency", "HKD")  # HKD 或 RMB
 
         prs = Presentation()
         prs.slide_width = Inches(13.333)
@@ -512,7 +513,7 @@ async def family_export_ppt(payload: dict = None):
                 cnt = sum(1 for p in pols if f"{p.get('age','?')}岁{p.get('gender','?')}" == person)
                 total_rows += cnt
 
-            ncols = 8
+            ncols = 7 if currency == "RMB" else 8
             slide = prs.slides.add_slide(prs.slide_layouts[6])
 
             # 标题
@@ -536,17 +537,25 @@ async def family_export_ppt(payload: dict = None):
                     tbl_pr.remove(child)
 
             # 列宽
-            table.columns[0].width = Inches(1.2)
-            table.columns[1].width = Inches(2.2)
-            table.columns[2].width = Inches(1.5)
-            table.columns[3].width = Inches(1.5)
-            table.columns[4].width = Inches(1.4)
-            table.columns[5].width = Inches(1.6)
-            table.columns[6].width = Inches(1.6)
-            table.columns[7].width = Inches(0.9)
-
-            # 表头
-            headers = ["家庭成员", "产品", "总保额(USD)", "总保额(HKD)", "前十年赠送(USD)", "年保费(USD)", "年保费(HKD)", "供款期"]
+            if currency == "RMB":
+                table.columns[0].width = Inches(1.3)
+                table.columns[1].width = Inches(2.5)
+                table.columns[2].width = Inches(1.7)
+                table.columns[3].width = Inches(1.6)
+                table.columns[4].width = Inches(1.8)
+                table.columns[5].width = Inches(1.8)
+                table.columns[6].width = Inches(1.0)
+                headers = ["家庭成员", "产品", "总保额(USD)", "前十年赠送(USD)", "年保费(USD)", f"年保费({currency})", "供款期"]
+            else:
+                table.columns[0].width = Inches(1.2)
+                table.columns[1].width = Inches(2.2)
+                table.columns[2].width = Inches(1.5)
+                table.columns[3].width = Inches(1.5)
+                table.columns[4].width = Inches(1.4)
+                table.columns[5].width = Inches(1.6)
+                table.columns[6].width = Inches(1.6)
+                table.columns[7].width = Inches(0.9)
+                headers = ["家庭成员", "产品", "总保额(USD)", "总保额(HKD)", "前十年赠送(USD)", "年保费(USD)", "年保费(HKD)", "供款期"]
             for ci, h in enumerate(headers):
                 cell = table.cell(0, ci)
                 cell.text = h
@@ -569,19 +578,24 @@ async def family_export_ppt(payload: dict = None):
                     table.cell(ri, 1).text = pol.get("product_name", "—")
                     # 总保额USD
                     table.cell(ri, 2).text = fmt_sum_usd(pol.get("sum_assured"))
-                    # 总保额HKD
-                    table.cell(ri, 3).text = fmt_sum_hkd(pol.get("sum_assured"))
-                    # 前十年赠送USD
-                    table.cell(ri, 4).text = fmt_sum_usd(pol.get("first_10y_bonus"))
-                    # 年保费USD
-                    table.cell(ri, 5).text = fmt_prem_usd(pol.get("annual_premium"))
-                    # 年保费HKD
-                    table.cell(ri, 6).text = fmt_prem_hkd(pol.get("annual_premium"))
-                    # 供款期
-                    py = pol.get("pay_years")
-                    table.cell(ri, 7).text = f"{py}年" if py else "—"
+                    
+                    if currency == "RMB":
+                        # RMB模式：总保额(USD) | 前十年赠送(USD) | 年保费(USD) | 年保费(RMB) | 供款期
+                        table.cell(ri, 3).text = fmt_sum_usd(pol.get("first_10y_bonus"))
+                        table.cell(ri, 4).text = fmt_prem_usd(pol.get("annual_premium"))
+                        table.cell(ri, 5).text = fmt_rmb(pol.get("annual_premium"))
+                        py = pol.get("pay_years")
+                        table.cell(ri, 6).text = f"{py}年" if py else "—"
+                    else:
+                        # HKD模式：总保额(USD) | 总保额(HKD) | 前十年赠送(USD) | 年保费(USD) | 年保费(HKD) | 供款期
+                        table.cell(ri, 3).text = fmt_sum_hkd(pol.get("sum_assured"))
+                        table.cell(ri, 4).text = fmt_sum_usd(pol.get("first_10y_bonus"))
+                        table.cell(ri, 5).text = fmt_prem_usd(pol.get("annual_premium"))
+                        table.cell(ri, 6).text = fmt_prem_hkd(pol.get("annual_premium"))
+                        py = pol.get("pay_years")
+                        table.cell(ri, 7).text = f"{py}年" if py else "—"
 
-                    for ci in range(8):
+                    for ci in range(ncols):
                         cell = table.cell(ri, ci)
                         cell.fill.solid()
                         cell.fill.fore_color.rgb = WHITE
