@@ -79,6 +79,14 @@ def _cl(data):
     return data.get("curLabel", "人民币")
 
 
+def _cur_code(cn_name):
+    """把中文货币名转换成英文缩写：美元→USD，港币→HKD，人民币→RMB"""
+    if "美元" in cn_name: return "USD"
+    if "港币" in cn_name: return "HKD"
+    if "人民币" in cn_name: return "RMB"
+    return cn_name
+
+
 def _style_cell(cell, text, bold=False, color=DARK, size=14, align=PP_ALIGN.CENTER, fill=None):
     cell.text = ""
     cell.vertical_anchor = MSO_ANCHOR.MIDDLE
@@ -288,7 +296,7 @@ def add_base_slides(prs, blank, data, rate=6.8):
         s = f"{r['simple_pct']}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
         c = f"{r['compound_pct']}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
         normal_rows.append([ylab(r), _wan(r["surrender"]), _rmb(r["surrender"], rate), s, c])
-    _build_table(slide, 2.05, [["保单年度", cur, f"{cl}（约）", "单利%/年", "复利%/年"]], normal_rows,
+    _build_table(slide, 2.05, [["保单年度", f"退保价值（{_cur_code(cur)}）", f"退保价值（{_cur_code(cl)}）", "单利%/年", "复利%/年"]], normal_rows,
                  col_w=[1.6, 1.8, 1.6, 1.1, 1.1], row_h=0.42, hdr_size=18, data_size=14, red_cols=[2],
                  be_index=be_index)
     _box(slide, "剩余资金可一次性取出，或传承给下一代", 0.52, 10.95, 7.22, size=16, color=RED, align=PP_ALIGN.CENTER)
@@ -308,7 +316,7 @@ def add_base_slides(prs, blank, data, rate=6.8):
             s = f"{r['simple_pct']}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
             c = f"{r['compound_pct']}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
             opt_rows.append([ylab(r), _wan(opt_of(r)), _rmb(opt_of(r), rate), s, c])
-        _build_table(slide, 1.14, [["保单年度", cur, f"{cl}（约）", "单利%/年", "复利%/年"]], opt_rows,
+        _build_table(slide, 1.14, [["保单年度", f"退保价值（{_cur_code(cur)}）", f"退保价值（{_cur_code(cl)}）", "单利%/年", "复利%/年"]], opt_rows,
                      col_w=[1.6, 1.8, 1.6, 1.1, 1.1], row_h=0.45, hdr_size=18, data_size=14, red_cols=[2],
                      be_index=be_index)
         _box(slide, "长远受每年 6.5% 客户总内部回报率规限，乐观与正常情景趋于一致",
@@ -437,7 +445,7 @@ def add_cim3_slides(prs, blank, data, rate=6.8):
         sr_rows.append([ylab(r), _wan(r["paid"]), _wan(r["death_total"]),
                         _wan(r["surrender"]), _rmb(r["surrender"], rate), s, c])
     _build_table(slide, 1.25,
-                 [["保单年度", "已缴保费", "首次重疾或身故", "退保价值（USD）", "退保价值（RMB）", "单利%/年", "复利%/年"]],
+                 [["保单年度", "已缴保费", "首次重疾或身故", f"退保价值（{_cur_code(cur)}）", f"退保价值（{_cur_code(cl)}）", "单利%/年", "复利%/年"]],
                  sr_rows, col_w=[1.05, 1.0, 1.12, 1.1, 1.05, 0.95, 0.95], row_h=0.42,
                  hdr_size=13, data_size=12, red_cols=[4])
     _footer(slide, rate, cl)
@@ -641,7 +649,7 @@ def add_encash_slides(prs, blank, data, rate=6.8):
         sr_rows.append([ylab(r), _wan(r["paid"]), _wan(r["death_total"]),
                         _wan(r["surrender"]), _rmb(r["surrender"], rate), s, c])
     _build_table(slide, 1.25,
-                 [["保单年度", "已缴保费", "人寿保障", f"退保价值({cur})", f"{cl}（约）", "单利%/年", "复利%/年"]],
+                 [["保单年度", "已缴保费", "人寿保障", f"退保价值（{_cur_code(cur)}）", f"退保价值（{_cur_code(cl)}）", "单利%/年", "复利%/年"]],
                  sr_rows, col_w=[1.05, 1.0, 1.1, 1.1, 1.05, 0.95, 0.95], row_h=0.42,
                  hdr_size=13, data_size=12, red_cols=[4])
     _footer(slide, rate, cl)

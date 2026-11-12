@@ -411,7 +411,7 @@ function render(data, fname){
     <div class="sec">
       <div class="sec-title">退保价值（乐观预期）</div>
       <div class="w-small" style="margin-bottom:8px;">（投资回报比现时预期每年上升约1.2%；长远受每年6.5%客户总内部回报率规限，乐观与正常情景趋于一致）</div>
-      <table class="w-table"><tr><th>保单年度</th><th>${cur}</th><th>${curLabel}（约）</th></tr>${optHtml}</table>
+      <table class="w-table"><tr><th>保单年度</th><th>退保价值（${cur === '美元' ? 'USD' : cur === '港币' ? 'HKD' : 'RMB'}）</th><th>退保价值（${curLabel === '人民币' ? 'RMB' : 'HKD'}）</th></tr>${optHtml}</table>
     </div>`;
   }
 
@@ -424,7 +424,7 @@ function render(data, fname){
       <div class="w-small" style="margin-bottom:8px;">保证现金价值无论市场表现如何均确定可获；非保证为保险公司宣布的终期红利，可能调整。</div>
       <table class="w-table">
         <tr><th rowspan="2">保单年度</th><th colspan="2">保证收益</th><th colspan="2">非保证收益</th></tr>
-        <tr><th>${cur}</th><th>${curLabel}（约）</th><th>${cur}</th><th>${curLabel}（约）</th></tr>
+        <tr><th>退保价值（${cur === '美元' ? 'USD' : cur === '港币' ? 'HKD' : 'RMB'}）</th><th>退保价值（${curLabel === '人民币' ? 'RMB' : 'HKD'}）</th><th>退保价值（${cur === '美元' ? 'USD' : cur === '港币' ? 'HKD' : 'RMB'}）</th><th>退保价值（${curLabel === '人民币' ? 'RMB' : 'HKD'}）</th></tr>
         ${gHtml}
       </table>
     </div>`;
@@ -529,7 +529,7 @@ function render(data, fname){
     <div class="sec">
       <div class="sec-title">退保价值（正常预期）</div>
       <table class="w-table">
-        <tr><th>保单年度</th><th>${cur}</th><th>${curLabel}（约）</th><th>单利%/年</th><th>复利%/年</th></tr>
+        <tr><th>保单年度</th><th>退保价值（${cur === '美元' ? 'USD' : cur === '港币' ? 'HKD' : 'RMB'}）</th><th>退保价值（${curLabel === '人民币' ? 'RMB' : 'HKD'}）</th><th>单利%/年</th><th>复利%/年</th></tr>
         ${normalHtml}
       </table>
       <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
@@ -766,7 +766,7 @@ function renderCIM3(data, fname){
       <div class="sec-title">退保价值与回报率</div>
       <div class="w-small" style="margin-bottom:8px;">单利/复利为基于总保费的估算年化回报；保单前期退保价值低于已缴保费，故回报率以"/"显示。</div>
       <table class="w-table">
-        <tr><th>保单年度</th><th>已缴保费</th><th>首次重疾或身故</th><th>退保价值（USD）</th><th>退保价值（RMB）</th><th>单利%/年</th><th>复利%/年</th></tr>
+        <tr><th>保单年度</th><th>已缴保费</th><th>首次重疾或身故</th><th>退保价值（${cur === '美元' ? 'USD' : cur === '港币' ? 'HKD' : 'RMB'}）</th><th>退保价值（${curLabel === '人民币' ? 'RMB' : 'HKD'}）</th><th>单利%/年</th><th>复利%/年</th></tr>
         ${srHtml}
       </table>
       <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
@@ -922,7 +922,7 @@ function renderENCASH(data, fname){
       <div class="sec-title">退保价值与回报率</div>
       <div class="w-small" style="margin-bottom:8px;">单利/复利为基于总保费的估算年化回报；保单前期退保价值低于已缴保费，故回报率以"/"显示。</div>
       <table class="w-table">
-        <tr><th>保单年度</th><th>已缴保费</th><th>人寿保障</th><th>退保价值(${cur})</th><th>${curLabel}（约）</th><th>单利%/年</th><th>复利%/年</th></tr>
+        <tr><th>保单年度</th><th>已缴保费</th><th>人寿保障</th><th>退保价值（${cur === '美元' ? 'USD' : cur === '港币' ? 'HKD' : 'RMB'}）</th><th>退保价值（${curLabel === '人民币' ? 'RMB' : 'HKD'}）</th><th>单利%/年</th><th>复利%/年</th></tr>
         ${srHtml}
       </table>
       <div class="w-rate">美元汇率：${rate}（仅供参考）</div>
