@@ -249,7 +249,9 @@ async function uploadAll(fileList){
         v.variant_label = w.start_year ? `第${w.start_year}年起提取` : null;
       });
       const b = variants[0].basic||{};
-      const label = variants[0].product_name.replace(/保险计划/g,'') + ` ${b.anb_age}岁 ${(b.total_premium/10000).toFixed(0)}万`;
+      const sa = b.sum_assured || 0;
+      const sa_wan = (sa/10000).toFixed(0);
+      const label = variants[0].product_name.replace(/保险计划/g,'') + ` ${b.anb_age}岁${b.gender||''} 保额${sa_wan}万`;
       return { label, variants };
     });
     window.allGroups = allGroups;
