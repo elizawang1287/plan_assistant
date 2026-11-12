@@ -628,5 +628,71 @@
     "rows_first3": [],
     "rows_last1": [],
     "warning": null
+  },
+  "CIT2": {
+    "product_code": "CIT2",
+    "product_name": "守护健康危疾定期保II",
+    "basic": {
+      "anb_age": 30,
+      "gender": "男",
+      "smoker": "非吸烟",
+      "currency": "美元",
+      "premium_type": "年缴",
+      "annual_premium": 256.0,
+      "pay_years": 51,
+      "total_premium": 199261.0,
+      "basic_amount": 100000.0,
+      "renew_cycle": 5,
+      "premium_schedule": [
+        {
+          "age": 30,
+          "annual_premium": 256.0
+        },
+        {
+          "age": 35,
+          "annual_premium": 335.0
+        },
+        {
+          "age": 40,
+          "annual_premium": 544.0
+        },
+        {
+          "age": 45,
+          "annual_premium": 882.0
+        },
+        {
+          "age": 50,
+          "annual_premium": 1395.0
+        },
+        {
+          "age": 55,
+          "annual_premium": 2350.0
+        },
+        {
+          "age": 60,
+          "annual_premium": 3878.0
+        },
+        {
+          "age": 65,
+          "annual_premium": 5625.0
+        },
+        {
+          "age": 70,
+          "annual_premium": 8421.0
+        },
+        {
+          "age": 75,
+          "annual_premium": 12619.0
+        },
+        {
+          "age": 80,
+          "annual_premium": 17736.0
+        }
+      ]
+    },
+    "rows_count": 0,
+    "rows_first3": [],
+    "rows_last1": [],
+    "warning": null
   }
 }

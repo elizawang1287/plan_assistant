@@ -21,6 +21,7 @@ TEST_PDFS = [
     ("PLP2", r"C:\Users\user\Documents\working\working\家庭规划书\53岁女\F_53_NS_PLP2_15_250000_rider_20261102.pdf"),
     ("LFRE2", r"C:\Users\user\Documents\working\working\家庭规划书\53岁女\F_53_NS_LFRE2_10_250000_20261102.pdf"),
     ("PLT5", r"C:\Users\user\Documents\working\working\家庭规划书\李总\M_50_NS_PLT5_36_300000_20261106.pdf"),
+    ("CIT2", r"C:\Users\user\Documents\working\M_30_NS_CIT2_51_100000_20261112.pdf"),
 ]
 
 BASELINE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "verify_baseline.json")
