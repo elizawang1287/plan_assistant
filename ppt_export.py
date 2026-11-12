@@ -744,11 +744,21 @@ def add_encash_slides(prs, blank, data, rate=6.8):
 
 
 def add_plt_slides(prs, blank, data, rate=6.8):
-    """定期寿险/定期重疾：基本信息 + 保障与保费。（无退保价值表）"""
+    """定期寿险/定期重疾：基本信息 + 保障与保费 + 续保保费明细。（无退保价值表）"""
     b = data["basic"]
     cl = _cl(data)
     cur = b.get("currency", "美元")
     age = b.get("anb_age", "")
+    is_cit2 = data.get("product_code") == "CIT2"
+
+    # 金额格式化：定期险金额不大，直接显示具体数字（带货币符号）
+    def _fmt(v):
+        if v is None: return "-"
+        sym = "$" if cur == "美元" else "HK$"
+        return sym + str(int(round(v))).replace(",", "") if False else sym + f"{int(round(v)):,}"
+    def _rmb_local(v):
+        if v is None: return "-"
+        return f"约{int(round(v * rate)):,}"
 
     # === Slide 1：基本信息 + 保障与保费 ===
     slide = prs.slides.add_slide(blank)
@@ -758,31 +768,63 @@ def add_plt_slides(prs, blank, data, rate=6.8):
 
     # 基本信息表
     _box(slide, "基本信息", 0.52, 1.20, 7.22, size=20, bold=True, color=DARK, align=PP_ALIGN.CENTER)
+    renew_cycle = b.get("renew_cycle")
+    renew_text = f"每{renew_cycle}年" if renew_cycle else "-"
     info_rows = [
         ["受保人", f"{b.get('anb_age')}岁 {b.get('gender','')}".strip() + (f"（{b.get('smoker')}）" if b.get('smoker') else "")],
         ["保单货币", cur],
-        ["保障期", b.get("coverage") or "定期"],
-        ["供款期", f"{b.get('pay_years')} 年" if b.get("pay_years") else "-"],
+        ["保障年期", f"{b.get('pay_years')}年" if b.get("pay_years") else "-"],
+        ["续保周期", renew_text],
     ]
     _build_table(slide, 1.68, [["项目", "内容"]], info_rows,
                  col_w=[3.2, 4.02], row_h=0.42, hdr_size=14, data_size=14, red_cols=[])
 
     # 保障与保费表
     _box(slide, "保障与保费", 0.52, 4.03, 7.22, size=20, bold=True, color=DARK, align=PP_ALIGN.CENTER)
+    sa = b.get("basic_amount") or 0
+    ap = b.get("annual_premium") or 0
+    tp = b.get("total_premium") or 0
     prot_rows = [
-        ["基本保额", _wan(b.get("basic_amount") or 0), _rmb(b.get("basic_amount") or 0, rate)],
-        ["首期年缴保费", f"{int(b.get('annual_premium') or 0):,}", f"{int((b.get('annual_premium') or 0) * rate):,}"],
-        ["总保费", f"{int(b.get('total_premium') or 0):,}", f"{int((b.get('total_premium') or 0) * rate):,}"],
+        ["基本保额", _fmt(sa), _rmb_local(sa)],
+        ["首期年缴保费", _fmt(ap), _rmb_local(ap)],
+        ["总保费（总投入）", _fmt(tp), _rmb_local(tp)],
     ]
     _build_table(slide, 4.52, [["项目", cur, f"{cl}（约）"]], prot_rows,
                  col_w=[3.2, 2.0, 2.0], row_h=0.42, hdr_size=14, data_size=14, red_cols=[2])
 
     # 说明文字
-    is_cit2 = data.get("product_code") == "CIT2"
     note = "※ 定期重疾险为消费型保险，无现金价值/退保价值。保费随年龄增长每5年续保上调。" if is_cit2 \
         else "※ 定期寿险为消费型保险，无现金价值/退保价值。保费随年龄增长逐年上调。"
     _box(slide, note, 0.52, 6.50, 7.22, size=14, color=GRAY, align=PP_ALIGN.CENTER)
     _footer(slide, rate, cl)
+
+    # === Slide 2：续保保费明细表（如果有premium_schedule）===
+    schedule = b.get("premium_schedule") or []
+    if schedule:
+        slide2 = prs.slides.add_slide(blank)
+        _box(slide2, "续保保费明细", 0.52, 0.15, 7.22, size=22, bold=True, color=DARK, align=PP_ALIGN.CENTER)
+        _box(slide2, f"（{len(schedule)}个保费节点）", 0.52, 0.55, 7.22, size=14, color=GRAY, align=PP_ALIGN.CENTER)
+
+        entry_age = b.get("anb_age") or schedule[0].get("age")
+        sched_rows = []
+        for node in schedule:
+            node_age = node.get("age")
+            policy_year = (node_age - entry_age) + 1 if entry_age else "-"
+            sched_rows.append([
+                f"{node_age}岁",
+                f"第{policy_year}年" if isinstance(policy_year, int) else policy_year,
+                _fmt(node.get("annual_premium"))
+            ])
+
+        _build_table(slide2, 1.05,
+                     [["投保/续保期初年龄(ANB)", "保单年度起点", "该续保期每年保费"]],
+                     sched_rows,
+                     col_w=[2.4, 2.4, 2.42], row_h=0.40, hdr_size=12, data_size=12, red_cols=[])
+
+        # 底部说明
+        note2 = f"※ 本计划书的保障及供款期为{b.get('pay_years') or '-'}年，续保周期为{renew_text}。以下采用原件精确金额，不推算未列年份。"
+        _box(slide2, note2, 0.52, 10.50, 7.22, size=12, color=GRAY, align=PP_ALIGN.CENTER)
+        _footer(slide2, rate, cl)
 
 
 def add_withdrawal_slide(prs, blank, data, rate=6.8, label=None):
