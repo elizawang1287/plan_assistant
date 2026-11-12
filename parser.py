@@ -589,19 +589,24 @@ def parse_cip2(text, basic):
     rows = parse_cim3_rows(text, basic.get("anb_age"), basic_extra.get("total_premium"),
                            basic_extra.get("annual_premium"), basic_extra.get("pay_years"))
 
+    basic_amount = basic_extra.get("basic_amount") or 0
+    gift10 = basic_extra.get("gift10") or 0
+    total_amount = basic_extra.get("total_amount") or (basic_amount + gift10)
+
     product_advantage = [
         {
             "title": "产品特点",
             "items": [
                 "有病赔钱，无病储蓄：保额逐年递增，抗通胀和医疗费用增长；重疾保障增长远超市场同类产品！退保时可连本带利取出，具备储蓄增值功能",
                 "疾病包括共74种，其中56种重大疾病、18种早期疾病，索偿早期严重疾病保障后，享有12个月保费豁免",
-                "重大疾病赔偿一次；早期疾病最多赔偿3次，每次可赔偿当时保额的25%",
+                f"重大疾病保障额预期不低于{basic_amount:,}美元；重大疾病赔偿一次；早期疾病最多赔偿3次，每次可赔偿当时保额的25%",
             ],
         },
         {
             "title": "权益与附加",
             "items": [
                 "递增保障权益，疏解通胀压力；自选附加选项，加强保障后盾",
+                f"首10年赠送保额：额外定期危疾首护保II赠送{gift10:,}美元，首10年总保障达{total_amount:,}美元",
             ],
         },
         {
