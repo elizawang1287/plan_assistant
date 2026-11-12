@@ -478,20 +478,25 @@ def parse_cim3(text, basic):
     rows = parse_cim3_rows(text, basic.get("anb_age"), basic_extra.get("total_premium"),
                            basic_extra.get("annual_premium"), basic_extra.get("pay_years"))
 
+    basic_amount = basic_extra.get("basic_amount") or 0
+    annuity_amount = int(basic_amount * 0.06)
+    gift10 = basic_extra.get("gift10") or 0
+    total_amount = basic_extra.get("total_amount") or (basic_amount + gift10)
+
     product_advantage = [
         {
             "title": "保障超全，持续一生",
             "items": [
                 "生·给宝宝的专属保障：严重湿疹、荨麻疹、肺炎住院津贴等均可获得补贴；终身保障疾病涵盖127种（49项早期严重疾病+56项严重疾病+15种儿童重疾+7种儿童次级疾病），确诊严重疾病获赔100%保额+累计红利，并豁免后续所有保费",
                 "病·深切治疗ICU保障：连续入住ICU三日或以上获赔10%保额；严重疾病延伸保障最高累计900%，每笔赔100%保额可多次赔付——癌症2次、心脏病/中风2次、脑退化症/帕金森1次、主要器官相关2次、其他严重疾病2次",
-                "老·给老人的专属保障：确诊严重脑退化症或帕金森病，提供终身领取的年金，每年6,000美元直至身故",
-                "死·身故额外保障：严重疾病理赔后、86岁之前身故，额外获赔100,000美元人寿延伸保障",
+                f"老·给老人的专属保障：确诊严重脑退化症或帕金森病，提供终身领取的年金，每年{annuity_amount:,}美元直至身故",
+                f"死·身故额外保障：严重疾病理赔后、86岁之前身故，额外获赔{basic_amount:,}美元人寿延伸保障",
             ],
         },
         {
             "title": "重疾保额逐年增长，抗通胀",
             "items": [
-                "首10年附送升级保障50,000美元，总保障150,000美元（首10年150%保障）",
+                f"首10年附送升级保障{gift10:,}美元，总保障{total_amount:,}美元（首10年150%保障）",
                 "特别红利随保单年期累积，身故/重疾保障逐年增长，抵御通胀",
                 "理赔无需发票报销，与内地社保、医保及商业保险不冲突，全球通用",
             ],
