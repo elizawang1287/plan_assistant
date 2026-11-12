@@ -9,6 +9,15 @@
 - 数据字号：正常/乐观表 18pt、保证/提取表 14pt
 - 隔行填充 FAFAFA；保证vs非保证表不隔行
 """
+
+# 产品组：集中管理产品分支
+# 重疾险产品（走add_cim3_slides）
+CRITICAL_PRODUCTS = {"CIM3", "CIE3", "CIP2"}
+# 医疗险产品（走add_encash_slides）
+MEDICAL_PRODUCTS = {"ENCASH"}
+# 定期险产品（走定期险模板）
+TERM_PRODUCTS = {"PLT1", "PLT5", "PLT10", "PLT20", "CIT2"}
+"""
 import io
 import re
 from pptx import Presentation
@@ -828,9 +837,9 @@ def _save(prs):
 def build_pptx(data, rate=6.8):
     """单份：基础表 + 提取页（CIM3/CIE3 / ENCASH 走专属页）。"""
     prs, blank = _new_prs()
-    if data.get("product_code") in ("CIM3", "CIE3", "CIP2"):
+    if data.get("product_code") in CRITICAL_PRODUCTS:
         add_cim3_slides(prs, blank, data, rate)
-    elif data.get("product_code") == "ENCASH":
+    elif data.get("product_code") in MEDICAL_PRODUCTS:
         add_encash_slides(prs, blank, data, rate)
     else:
         add_base_slides(prs, blank, data, rate)
