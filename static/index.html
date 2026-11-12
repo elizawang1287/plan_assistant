@@ -988,7 +988,8 @@ $('#btnImg').onclick = async () => {
       $('#status').textContent = '已保存到你选的位置 ✓';
       return;
     } catch(e) {
-      if (e.name === 'AbortError') { $('#status').textContent = '已取消保存'; return; }
+      // 不管什么错误，都回退到普通下载方式
+      console.warn('showSaveFilePicker failed, fallback to normal download:', e);
     }
   }
   const a = document.createElement('a');
@@ -1018,7 +1019,8 @@ $('#btnLong').onclick = async () => {
         $('#status').textContent = '长图已保存到你选的位置 ✓';
         return;
       } catch(e) {
-        if (e.name === 'AbortError') { $('#status').textContent = '已取消保存'; return; }
+        // 不管什么错误，都回退到普通下载方式
+        console.warn('showSaveFilePicker failed, fallback to normal download:', e);
       }
     }
     const a = document.createElement('a');
