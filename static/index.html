@@ -605,7 +605,7 @@ function renderCIM3(data, fname){
   const curLabel = document.querySelector('input[name="cur"]:checked').value === 'HKD' ? '港币' : '人民币';
   // 行选择与标签：完整逐年表（有补充说明）→ 每5年+末行，全部按「第X年」；
   // 断档里程碑表（无补充说明）→ 30年前按「第X年」、30年后按「X岁」
-  const rows = pickRows(data.rows);
+  const rows = pickRows(data.rows, data.product_code);
   const lastY = rows.length ? rows[rows.length-1].year : null;
   const hasGap = rows.some(r => r.is_age_marker && r.year !== lastY);
   // 金额缩写：>=1亿"X.X亿"，否则"X.X万"；整亿/整万不带小数；直接舍去

@@ -357,7 +357,7 @@ def add_cim3_slides(prs, blank, data, rate=6.8):
     cl = _cl(data)
     cur = b.get("currency", "美元")
     all_rows = data["rows"]
-    rows = pick_rows(all_rows)
+    rows = pick_rows(all_rows, EXTRA_ROWS_YEARS.get(data.get("product_code")))
     last_y = rows[-1]["year"] if rows else None
     has_gap = any(r.get("is_age_marker") and r["year"] != last_y for r in rows)
     age = b.get("anb_age", "")
