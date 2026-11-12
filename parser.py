@@ -26,6 +26,90 @@ PRODUCT_NAMES = {
     "CIT2": "守护健康危疾定期保II",
 }
 
+# 产品配置表：集中管理所有产品的属性
+# render_type: 渲染模板类型（savings=储蓄险, critical=重疾险, term=定期险, medical=医疗险）
+# extra_years: 退保价值表额外展示的年份
+# breakeven_year: 预期回本年份
+PRODUCT_CONFIG = {
+    "PRMESP": {
+        "keywords": ["PRMESP", "世譽財富", "世誉财富"],
+        "category": "储蓄/退休",
+        "render_type": "savings",
+        "extra_years": {4},
+        "breakeven_year": None,
+    },
+    "TRST": {
+        "keywords": ["TRST", "信守明天"],
+        "category": "储蓄/退休",
+        "render_type": "savings",
+        "extra_years": {8},
+        "breakeven_year": 8,
+    },
+    "CIM3": {
+        "keywords": ["CIM3", "誠保一生", "诚保一生"],
+        "category": "危疾",
+        "render_type": "critical",
+        "extra_years": {1},
+        "breakeven_year": None,
+    },
+    "CIE3": {
+        "keywords": ["CIE3"],
+        "category": "危疾",
+        "render_type": "critical",
+        "extra_years": {1},
+        "breakeven_year": None,
+    },
+    "CIP2": {
+        "keywords": ["CIP2", "危疾首護", "危疾首护"],
+        "category": "危疾",
+        "render_type": "critical",
+        "extra_years": {1},
+        "breakeven_year": None,
+    },
+    "PHOR": {
+        "keywords": ["PHOR", "誠譽財富", "诚誉财富"],
+        "category": "储蓄/退休",
+        "render_type": "savings",
+        "extra_years": set(),
+        "breakeven_year": None,
+    },
+    "PACE": {
+        "keywords": ["PACE", "駿譽財富", "骏誉财富"],
+        "category": "储蓄/退休",
+        "render_type": "savings",
+        "extra_years": set(),
+        "breakeven_year": None,
+    },
+    "LFRE2": {
+        "keywords": ["LFRE2", "自主未來", "自主未来"],
+        "category": "储蓄/寿险",
+        "render_type": "savings",
+        "extra_years": set(),
+        "breakeven_year": None,
+    },
+    "PLP2": {
+        "keywords": ["PLP2", "美好人生"],
+        "category": "储蓄/寿险",
+        "render_type": "savings",
+        "extra_years": set(),
+        "breakeven_year": None,
+    },
+    "ENCASH": {
+        "keywords": ["ENCASH", "加護一生住院現金", "住院現金儲蓄保險"],
+        "category": "住院现金",
+        "render_type": "medical",
+        "extra_years": set(),
+        "breakeven_year": None,
+    },
+    "CIT2": {
+        "keywords": ["CIT2", "守護健康危疾定期保II", "守护健康危疾定期保II"],
+        "category": "定期危疾",
+        "render_type": "term",
+        "extra_years": set(),
+        "breakeven_year": None,
+    },
+}
+
 NUM = re.compile(r"^\d{1,3}(,\d{3})+(\.\d+)?$")  # 25,000 / 1,240,550
 VAL = re.compile(r"^\d+(\.\d+)?$")                # 任意数字（含 0 / 25,000 由 NUM 另配）
 PLAIN_NUM = re.compile(r"^\d+$")                  # 纯整数年份
@@ -44,30 +128,12 @@ def extract_text(pdf_path):
 
 
 def detect_product(text):
-    if "PRMESP" in text or "世譽財富" in text:
-        return "PRMESP"
-    if "TRST" in text or "信守明天" in text:
-        return "TRST"
-    if "CIE3" in text:
-        return "CIE3"
-    if "CIM3" in text or "誠保一生" in text:
-        return "CIM3"
-    if "CIP2" in text or "危疾首護保險計劃 II" in text or "危疾首护保险计划 II" in text:
-        return "CIP2"
-    if "ENCASH" in text or "加護一生住院現金" in text or "住院現金儲蓄保險" in text:
-        return "ENCASH"
-    if "PLP2" in text or "美好人生保險計劃 II" in text or "美好人生保险计划 II" in text:
-        return "PLP2"
-    if "LFRE2" in text or "自主未來" in text or "自主未来" in text:
-        return "LFRE2"
-    if "PHOR" in text or "誠譽財富" in text or "诚誉财富" in text:
-        return "PHOR"
-    if "PACE" in text or "駿譽財富" in text or "骏誉财富" in text:
-        return "PACE"
-    # CIT2：守护健康危疾定期保II
-    if "CIT2" in text or "守護健康危疾定期保II" in text or "守护健康危疾定期保II" in text:
-        return "CIT2"
-    # PLT系列：守护家人定期寿险
+    # 用产品配置表驱动，不再逐个产品写
+    for code, config in PRODUCT_CONFIG.items():
+        for keyword in config["keywords"]:
+            if keyword in text:
+                return code
+    # PLT系列：守护家人定期寿险（特殊处理，因为有多个续保期）
     if "守護家人" in text or "守护家人" in text:
         if "(PLT1)" in text or "（PLT1）" in text:
             return "PLT1"
