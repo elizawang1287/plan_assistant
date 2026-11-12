@@ -55,7 +55,13 @@ def pick_rows(data_rows, extra_years=None):
 
 
 def _wan(v):
-    """美元金额缩写：>=1亿显示亿，否则万；整亿/整万去小数，其余保留1位小数。"""
+    """美元金额缩写：小于1万显示具体数字，否则万/亿；整亿/整万去小数，其余保留1位小数。"""
+    if v is None:
+        return "-"
+    if v == 0:
+        return "0"
+    if v < 10000:
+        return f"{int(round(v)):,}"
     if v >= 1e8:
         t = int(v // 1e7 + 1e-9) / 10
         return f"{int(t)} 亿" if t == int(t) else f"{t:.1f} 亿"
