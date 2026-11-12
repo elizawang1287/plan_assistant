@@ -906,16 +906,29 @@ def parse_optimistic(text, anb_age):
         # 遇到身故赔偿表（8列）就停
         if "身故賠償" in ln and "不同投資回報" in ln:
             break
+        
+        # 处理纯数字年份
+        year = None
+        age = None
         if PLAIN_NUM.match(ln) and 1 <= int(ln) <= 101:
+            year = int(ln)
+            age = (anb_age + year) if anb_age else None
+        else:
+            # 处理@ANB XX歲格式
+            m = ANB.search(ln)
+            if m:
+                age = int(m.group(1))
+                year = (age - anb_age) if anb_age else None
+        
+        if year is not None:
             vals = []
             j = i + 1
             while j < n and len(vals) < 6 and (NUM.match(lines[j]) or VAL.match(lines[j])):
                 vals.append(_to_num(lines[j]))
                 j += 1
             if len(vals) == 6:
-                year = int(ln)
                 out[year] = {
-                    "age": (anb_age + year) if anb_age else None,
+                    "age": age,
                     "optimistic": vals[5],     # 乐观总额 (A)+(C)
                     "pessimistic": vals[3],    # 悲观总额
                 }
