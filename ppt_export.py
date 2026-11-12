@@ -437,7 +437,7 @@ def add_cim3_slides(prs, blank, data, rate=6.8):
         sr_rows.append([ylab(r), _wan(r["paid"]), _wan(r["death_total"]),
                         _wan(r["surrender"]), _rmb(r["surrender"], rate), s, c])
     _build_table(slide, 1.25,
-                 [["保单年度", "已缴保费", "首次重疾或身故", f"退保价值({cur})", f"{cl}（约）", "单利%/年", "复利%/年"]],
+                 [["保单年度", "已缴保费", "首次重疾或身故", "退保价值（USD）", "退保价值（RMB）", "单利%/年", "复利%/年"]],
                  sr_rows, col_w=[1.05, 1.0, 1.12, 1.1, 1.05, 0.95, 0.95], row_h=0.42,
                  hdr_size=13, data_size=12, red_cols=[4])
     _footer(slide, rate, cl)
