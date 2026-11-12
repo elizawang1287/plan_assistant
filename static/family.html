@@ -661,7 +661,7 @@ function render() {
 
   if (editOpen) {
     html += '<table style="margin-top:-1px;border-radius:0 0 10px 10px"><thead><tr>';
-    html += '<th>受保人</th><th>产品</th><th>类型</th><th>保额(USD)</th><th>年缴(USD)</th><th>供款期</th><th>HKD年缴</th><th>RMB年缴</th><th>文件名</th><th>操作</th>';
+    html += '<th>受保人</th><th>产品</th><th>类型</th><th>保额(USD)</th><th>前十年赠送(USD)</th><th>年缴(USD)</th><th>供款期</th><th>HKD年缴</th><th>RMB年缴</th><th>文件名</th><th>操作</th>';
     html += '</tr></thead><tbody>';
     policies.forEach((p, i) => {
       html += `<tr>
@@ -669,6 +669,7 @@ function render() {
         <td><input value="${p.product_name||''}" style="width:130px" onchange="policies[${i}].product_name=this.value;render()"></td>
         <td><span class="cat-tag ${catClass(p.category)}">${p.category||'其他'}</span></td>
         <td class="num"><input value="${p.sum_assured||''}" style="width:90px" onchange="policies[${i}].sum_assured=parseFloat(this.value);render()"></td>
+        <td class="num"><input value="${p.first_10y_bonus||''}" style="width:90px" placeholder="0" onchange="policies[${i}].first_10y_bonus=parseFloat(this.value);render()"></td>
         <td class="num"><input value="${p.annual_premium||''}" style="width:90px" onchange="policies[${i}].annual_premium=parseFloat(this.value);render()"></td>
         <td><input value="${p.pay_years||''}" style="width:50px" onchange="policies[${i}].pay_years=parseInt(this.value);render()"></td>
         <td class="num">${fmtHkd(p.annual_premium)}</td>
@@ -679,7 +680,7 @@ function render() {
     });
     html += '</tbody></table>';
     html += '<div style="padding:10px 0;text-align:center">';
-    html += '<button onclick="policies.push({age:null,gender:null,product_name:\'\',category:\'其他\',sum_assured:null,annual_premium:null,pay_years:null,currency:\'USD\',filename:\'手动添加\'});render()" style="border:1px dashed var(--line);background:#fff;color:var(--pr);padding:8px 24px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">+ 新增保单</button>';
+    html += '<button onclick="policies.push({age:null,gender:null,product_name:\'\',category:\'其他\',sum_assured:null,first_10y_bonus:null,annual_premium:null,pay_years:null,currency:\'USD\',filename:\'手动添加\'});render()" style="border:1px dashed var(--line);background:#fff;color:var(--pr);padding:8px 24px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">+ 新增保单</button>';
     html += '</div>';
   }
 
