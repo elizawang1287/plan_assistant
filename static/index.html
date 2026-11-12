@@ -977,21 +977,7 @@ $('#btnImg').onclick = async () => {
   const prod = (lastData.product_name || '计划书').replace(/保险计划/g,'').replace(/\s/g,'');
   const prem = ((b.basic_amount||0)/10000).toFixed(1).replace(/\.0$/,'');
   const sug = multi ? `${prod}_${b.anb_age||''}岁_${prem}万_多方案.pptx` : `${prod}_${b.anb_age||''}岁_${prem}万.pptx`;
-  if (window.showSaveFilePicker) {
-    try {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: sug,
-        types: [{ description: 'PowerPoint', accept: {'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx']} }]
-      });
-      const w = await handle.createWritable();
-      await w.write(blob); await w.close();
-      $('#status').textContent = '已保存到你选的位置 ✓';
-      return;
-    } catch(e) {
-      // 不管什么错误，都回退到普通下载方式
-      console.warn('showSaveFilePicker failed, fallback to normal download:', e);
-    }
-  }
+  // 直接用普通下载方式，不用showSaveFilePicker（改地址会被浏览器阻止）
   const a = document.createElement('a');
   a.download = sug;
   a.href = URL.createObjectURL(blob);
@@ -1008,21 +994,7 @@ $('#btnLong').onclick = async () => {
     const prod = (lastData.product_name || '计划书').replace(/保险计划/g,'').replace(/\s/g,'');
     const prem = ((b.basic_amount||0)/10000).toFixed(1).replace(/\.0$/,'');
     const sug = `${prod}_${b.anb_age||''}岁_${prem}万_长图.png`;
-    if (window.showSaveFilePicker) {
-      try {
-        const handle = await window.showSaveFilePicker({
-          suggestedName: sug,
-          types: [{ description: 'PNG 图片', accept: {'image/png': ['.png']} }]
-        });
-        const w = await handle.createWritable();
-        await w.write(blob); await w.close();
-        $('#status').textContent = '长图已保存到你选的位置 ✓';
-        return;
-      } catch(e) {
-        // 不管什么错误，都回退到普通下载方式
-        console.warn('showSaveFilePicker failed, fallback to normal download:', e);
-      }
-    }
+    // 直接用普通下载方式，不用showSaveFilePicker（改地址会被浏览器阻止）
     const a = document.createElement('a');
     a.download = sug;
     a.href = URL.createObjectURL(blob);
