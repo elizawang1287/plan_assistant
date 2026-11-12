@@ -400,7 +400,7 @@ def add_cim3_slides(prs, blank, data, rate=6.8):
     # === Slide 2：基本保障 ===
     slide = prs.slides.add_slide(blank)
     _box(slide, "基本保障", 3.11, 0.20, 2.0, size=22, bold=True, color=DARK, align=PP_ALIGN.CENTER)
-    if data.get("product_code") == "CIE3":
+    if data.get("product_code") in ("CIE3", "CIP2"):
         _box(slide, "严重疾病延伸保障：癌症额外2次、心脏病/中风额外2次每次100%保额；癌症治疗保障60%；首10年含额外危疾加护保III",
              0.51, 0.99, 7.24, size=12, color=GRAY, align=PP_ALIGN.CENTER)
         prot_rows = [[ylab(r), _wan(r["paid"]), _wan(r["death_total"]), _wan(r["surrender"])] for r in rows]
@@ -454,7 +454,7 @@ def add_cim3_slides(prs, blank, data, rate=6.8):
         table_top = 0.98
     G = b.get("basic_amount") or 0
     gift = b.get("gift10") or 0
-    if data.get("product_code") == "CIE3":
+    if data.get("product_code") in ("CIE3", "CIP2"):
         groups = [
             ("危疾保障", [
                 ("第一次严重疾病理赔", "覆盖56种严重疾病；首10年含额外危疾加护保III，总保障150%", G + gift),
@@ -526,7 +526,7 @@ def add_cim3_slides(prs, blank, data, rate=6.8):
     slide = prs.slides.add_slide(blank)
     _box(slide, "产品优势", 3.2, 0.15, 1.9, size=22, bold=True, color=DARK, align=PP_ALIGN.CENTER)
     top = 0.65
-    if data.get("product_code") == "CIE3":
+    if data.get("product_code") in ("CIE3", "CIP2"):
         # CIE3：三组卖点一页，红色竖线标题 + 黑点列表（对齐网页 .adv 样式）
         # 1.5 倍行距，size=16pt 每行高 = 16*1.5/72 = 0.333 寸
         line_h = 16 * 1.5 / 72
@@ -814,7 +814,7 @@ def _save(prs):
 def build_pptx(data, rate=6.8):
     """单份：基础表 + 提取页（CIM3/CIE3 / ENCASH 走专属页）。"""
     prs, blank = _new_prs()
-    if data.get("product_code") in ("CIM3", "CIE3"):
+    if data.get("product_code") in ("CIM3", "CIE3", "CIP2"):
         add_cim3_slides(prs, blank, data, rate)
     elif data.get("product_code") == "ENCASH":
         add_encash_slides(prs, blank, data, rate)
