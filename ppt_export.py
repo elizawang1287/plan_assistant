@@ -17,7 +17,7 @@ CRITICAL_PRODUCTS = {"CIM3", "CIE3", "CIP2"}
 MEDICAL_PRODUCTS = {"ENCASH"}
 # 定期险产品（走定期险模板）
 TERM_PRODUCTS = {"PLT1", "PLT5", "PLT10", "PLT20", "CIT2"}
-"""
+
 import io
 import re
 from pptx import Presentation
