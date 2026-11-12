@@ -394,7 +394,7 @@ def add_cim3_slides(prs, blank, data, rate=6.8):
     _footer(slide, rate, cl)
 
     gift_text = f"{_wan(b.get('basic_amount') or 0)}×9次"
-    ann_text = "6,000美元/年"
+    ann_text = f"{int((b.get('basic_amount') or 0) * 0.06):,}/年"
     life_text = f"{_wan(b.get('basic_amount') or 0)}美元"
 
     # === Slide 2：基本保障 ===
@@ -409,7 +409,7 @@ def add_cim3_slides(prs, blank, data, rate=6.8):
                      prot_rows, col_w=[1.7, 1.7, 2.6, 1.8], row_h=0.42,
                      hdr_size=14, data_size=13, red_cols=[3])
     else:
-        _box(slide, "再次重疾每次100%基本保额、最多9次；年金每年6,000美元；人寿延伸保障100,000美元（86岁前身故）",
+        _box(slide, f"再次重疾每次100%基本保额、最多9次；年金每年{int((b.get('basic_amount') or 0) * 0.06):,}美元；人寿延伸保障{_wan(b.get('basic_amount') or 0)}美元（86岁前身故）",
              0.52, 0.72, 7.22, size=12, color=GRAY, align=PP_ALIGN.CENTER)
         prot_rows = [[ylab(r), _wan(r["paid"]), _wan(r["death_total"]),
                       gift_text, ann_text, life_text, _wan(r["surrender"])] for r in rows]
