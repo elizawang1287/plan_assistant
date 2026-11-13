@@ -162,6 +162,7 @@
 // ===== 状态 =====
 let policies = [];        // 从计划书PDF解析出的保单
 let planImages = [];      // 计划书图片文件（不解析，直接收集）
+let planFiles = [];        // 保单计划书原件File（用于导出时按文件名配对截图）
 let extractFiles = [];    // 提取方案文件列表（PDF+图片，都不解析）
 let shotFiles = [];       // 财务概览截图列表
 
@@ -238,6 +239,8 @@ async function uploadPdfFiles(files) {
           policies.push(p);
         }
       }
+      // 保单原件File按顺序登记，供导出配对截图
+      data.policies.forEach((p, i) => { if (pdfFiles[i]) planFiles.push({ filename: pdfFiles[i].name, file: pdfFiles[i] }); });
       total += pdfFiles.length;
     } catch (e) {
       statusEl.textContent = 'PDF解析失败：' + e.message;
@@ -261,6 +264,7 @@ async function uploadPdfFiles(files) {
             policies.push(p);
           }
         }
+        data.policies.forEach((p, i) => { if (htmlFiles[i]) planFiles.push({ filename: htmlFiles[i].name, file: htmlFiles[i] }); });
         total += htmlFiles.length;
       }
     } catch (e) {
@@ -285,6 +289,7 @@ async function uploadPdfFiles(files) {
             policies.push(p);
           }
         }
+        data.policies.forEach((p, i) => { if (imgFiles[i]) planFiles.push({ filename: imgFiles[i].name, file: imgFiles[i] }); });
         total += imgFiles.length;
       }
     } catch (e) {
@@ -453,10 +458,14 @@ function renderResult() {
     list.forEach(p => {
       const sa = p.sum_assured ? '$' + p.sum_assured.toLocaleString('en-US', {maximumFractionDigits:0}) : '—';
       const prem = p.annual_premium ? '$' + p.annual_premium.toLocaleString('en-US', {maximumFractionDigits:1}) : '—';
+      const isMedical = (p.category || '').includes('医疗');
       let remain = '—';
-      if (p.remaining_pay_years !== null && p.remaining_pay_years !== undefined) {
+      if (p.pay_term === '终身' || isMedical) {
+        remain = '—';
+      } else if (p.remaining_pay_years !== null && p.remaining_pay_years !== undefined) {
         remain = p.remaining_pay_years === 0 ? '缴费期满' : p.remaining_pay_years + '年';
       }
+      const payTerm = p.pay_term === '终身' ? '终身' : (p.pay_years ? p.pay_years + '年' : (isMedical ? '终身' : '—'));
       html += `<tr>
         <td><span class="cat-tag ${catClass(p.category)}">${catLabel(p.category)}</span></td>
         <td style="text-align:left">${p.product_name || '—'}</td>
@@ -464,7 +473,7 @@ function renderResult() {
         <td>${sa}</td>
         <td>${p.first_10y_bonus || '—'}</td>
         <td>${prem}</td>
-        <td>${p.pay_years ? p.pay_years + '年' : '—'}</td>
+        <td>${payTerm}</td>
         <td>${remain}</td>
       </tr>`;
     });
@@ -485,6 +494,10 @@ document.getElementById('btnExport').onclick = async () => {
     // 提取方案文件（需要拿到原始File对象，不只是name/size）
     // 之前addExtractFiles只存了name和size，现在要改成存File对象
     // 先临时从input里拿，后面改数据结构
+    // 保单计划书原件（用于详情页按文件名配对截图）
+    for (const pf of planFiles) {
+      if (pf.file) fd.append('policy_files', pf.file);
+    }
     // 提取方案文件
     for (const f of extractFiles) {
       if (f.file) fd.append('extract_files', f.file);
@@ -523,6 +536,7 @@ document.getElementById('btnExport').onclick = async () => {
 document.getElementById('btnClear').onclick = () => {
   policies = [];
   planImages = [];
+  planFiles = [];
   extractFiles = [];
   shotFiles = [];
   statusEl.textContent = '';

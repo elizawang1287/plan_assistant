@@ -3,6 +3,8 @@
 结构：封面 → 现有保单汇总（按人分表+总保费汇总）→ 产品详情页
 """
 import io
+import os
+import re
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
@@ -31,6 +33,27 @@ def _style_cell(cell, text, bold=False, color=DARK, size=10, align=PP_ALIGN.CENT
     if fill is not None:
         cell.fill.solid()
         cell.fill.fore_color.rgb = fill
+
+
+def _pay_label(p):
+    """缴费年期：终身缴交显示「终身」，数字供款期显示「X年」，否则 —"""
+    if p.get("pay_term") == "终身":
+        return "终身"
+    if p.get("pay_years"):
+        return f"{p['pay_years']}年"
+    # 兜底：医疗类未取到供款年期，按终身处理
+    if "医疗" in (p.get("category") or ""):
+        return "终身"
+    return "—"
+
+
+def _remain_label(p):
+    """剩余缴费：终身缴交显示 —，数字剩余 >0 显示「X年」，否则缴费期满"""
+    if p.get("pay_term") == "终身" or "医疗" in (p.get("category") or ""):
+        return "—"
+    if p.get("remaining_pay_years") and p["remaining_pay_years"] > 0:
+        return f"{p['remaining_pay_years']}年"
+    return "缴费期满"
 
 
 def _remove_table_style(table):
@@ -139,17 +162,19 @@ def _extract_extraction_plan(pdf_path, product_code=""):
         result["annual_extraction"] = withdrawal_data.get("annual_withdrawal")
 
     # 概览页：提取总额、101岁退保价值
-    if product_code == "PRMESP":
-        summary_page = 20  # 第21页
-    elif product_code == "TRST":
-        summary_page = 23  # 第24页
-    else:
-        summary_page = None
-        for i in range(len(doc)):
-            text = doc[i].get_text()
-            if "補充說明摘要之概覽" in text and "提取" in text:
-                summary_page = i
-                break
+    # 优先按页内标题「補充說明摘要之概覽」定位；不同版本/提取年份页码会变化，
+    # 定位不到再回退到各产品的固定页码兜底。
+    summary_page = None
+    for i in range(len(doc)):
+        text = doc[i].get_text()
+        if "補充說明摘要之概覽" in text and "提取" in text:
+            summary_page = i
+            break
+    if summary_page is None:
+        if product_code == "PRMESP":
+            summary_page = 20  # 第21页兜底
+        elif product_code == "TRST":
+            summary_page = 23  # 第24页兜底
 
     if summary_page is not None and summary_page < len(doc):
         text = doc[summary_page].get_text()
@@ -198,15 +223,44 @@ def _html_to_image(html_path):
     html_path_unix = html_path.replace('\\', '/')
     tmp_png_unix = tmp_png.replace('\\', '/')
     
-    # 写一个临时脚本
+    # 写一个临时脚本：只截主体主要表格（身份/客户/保单/缴费/保障），
+    # 隐藏左侧导航、语言与报告链接、脚注提示、受益人表。
     script = f'''
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
-    page = browser.new_page(viewport={{'width': 800, 'height': 1200}})
+    page = browser.new_page(viewport={{'width': 900, 'height': 1200}})
     page.goto("file:///{html_path_unix}")
     page.wait_for_load_state("networkidle")
-    page.screenshot(path="{tmp_png_unix}", full_page=True)
+    page.evaluate("""() => {{
+        const hide = (sel) => document.querySelectorAll(sel).forEach(e => e.style.display = 'none');
+        hide('#details_menu');
+        hide('#lang_div');
+        hide('#report_container');
+        hide('p.remark');
+        document.querySelectorAll('#details_container table.result_details').forEach(t => {{
+            const txt = t.textContent || '';
+            if (/保單人士|保单人士/.test(txt) || (txt.includes('身份') && txt.includes('分配比例'))) {{
+                t.style.display = 'none';
+            }}
+        }});
+        // 去掉经纪人键值单元格（只删该单元格及其相邻值格，保留同行的持有人/受保人）
+        document.querySelectorAll('#details_container table.result_details tr').forEach(tr => {{
+            tr.querySelectorAll('td.result_key').forEach(keyTd => {{
+                const key = keyTd.textContent || '';
+                if (/介紹營業員|介绍营业员|服務提供者|服务提供者|服務營業員|服务营业员/.test(key)) {{
+                    keyTd.style.display = 'none';
+                    const v = keyTd.nextElementSibling;
+                    if (v) v.style.display = 'none';
+                }}
+            }});
+        }});
+    }}""")
+    el = page.query_selector('#details_container')
+    if el:
+        el.screenshot(path="{tmp_png_unix}")
+    else:
+        page.screenshot(path="{tmp_png_unix}", full_page=True)
     browser.close()
 '''
     script_file = os.path.join(tempfile.gettempdir(), f"shot_script_{os.getpid()}.py")
@@ -596,13 +650,15 @@ def _order_extract_paths(policies, extract_paths):
     return ordered
 
 
-def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟", extract_paths=None, shot_paths=None):
+def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟", extract_paths=None, shot_paths=None, policy_paths=None):
     """生成家庭保单检视PPT（竖版A4）。
     extract_paths: 提取方案文件路径列表（PDF/图片）
     shot_paths: 财务概览文件路径列表（PDF/图片）
+    policy_paths: 保单计划书原件列表 [{"path":..., "filename":...}]，详情页按文件名优先配对
     """
     extract_paths = extract_paths or []
     shot_paths = shot_paths or []
+    policy_paths = policy_paths or []
     prs = Presentation()
     prs.slide_width = Inches(8.27)   # A4竖版宽
     prs.slide_height = Inches(11.69)  # A4竖版高
@@ -716,8 +772,8 @@ def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟
             sa = f"${p['sum_assured']:,.0f}" if p.get("sum_assured") else "—"
             bonus = f"${p['first_10y_bonus']:,.0f}" if p.get("first_10y_bonus") else "—"
             prem = f"${p['annual_premium']:,.0f}" if p.get("annual_premium") else "—"
-            pay = f"{p['pay_years']}年" if p.get("pay_years") else "—"
-            remain = f"{p['remaining_pay_years']}年" if p.get("remaining_pay_years") and p['remaining_pay_years'] > 0 else "缴费期满"
+            pay = _pay_label(p)
+            remain = _remain_label(p)
 
             fill = LIGHT if r % 2 == 1 else None
             _style_cell(table.cell(row_idx, 0), cat_short, size=9, fill=fill)
@@ -788,7 +844,7 @@ def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟
                 ("计划名称", p.get("product_name", "—")),
                 ("保额(美金)", f"${p['sum_assured']:,.0f}" if p.get("sum_assured") else "—"),
                 ("首期保费日", p.get("first_premium_date", "—")),
-                ("缴费年期", f"{p['pay_years']}年" if p.get("pay_years") else "—"),
+                ("缴费年期", _pay_label(p)),
             ]
 
             rows = 2
@@ -849,9 +905,27 @@ def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟
     # 产品详情页从提取方案PDF里截取第6页
     from parser import parse_basic_from_text
     
-    # 先解析所有提取方案PDF的产品信息
+    # 先解析所有候选文件（保单计划书优先，提取方案补充）的产品信息
     pdf_info_list = []
-    for ep in extract_paths:
+
+    def _add_candidate(ep, fname=None):
+        import os as _os
+        ext = _os.path.splitext(ep)[1].lower()
+        pdf_info = {
+            'path': ep,
+            'filename': fname or os.path.basename(ep),
+            'product_name': '',
+            'age': '',
+            'gender': '',
+            'product_code': '',
+            'insured_name': None,
+            'is_savings': False,
+            'file_type': ext.lstrip('.'),
+        }
+        # HTML 保单详情页：不做 PDF 文本解析，登记入池按文件名配对，配图时用 Chromium 截图
+        if ext in ('.html', '.htm'):
+            pdf_info_list.append(pdf_info)
+            return
         try:
             import fitz
             doc_tmp = fitz.open(ep)
@@ -860,26 +934,32 @@ def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟
                 text += doc_tmp[j].get_text() + "\n"
             doc_tmp.close()
             basic = parse_basic_from_text(text)
-            
+
             # 提取受保人名字
             import re
             insured_name = None
             m = re.search(r"受保人\s*\n?\s*[A-Z ]*([\u4e00-\u9fff]{2,5})\s*\(", text)
             if m:
                 insured_name = m.group(1)
-            
-            pdf_info = {
-                'path': ep,
+
+            pdf_info.update({
                 'product_name': basic.get("product_name", ""),
                 'age': basic.get("age", ""),
                 'gender': basic.get("gender", ""),
                 'product_code': basic.get("product_code", ""),
                 'insured_name': insured_name,
                 'is_savings': "储蓄" in basic.get("category", "") or "PRMESP" in basic.get("product_code", "") or "TRST" in basic.get("product_code", ""),
-            }
+            })
             pdf_info_list.append(pdf_info)
         except:
             pass
+
+    # 保单计划书原件（优先按文件名精确配对）
+    for pp in policy_paths:
+        _add_candidate(pp.get("path"), pp.get("filename"))
+    # 提取方案 PDF（补充）
+    for ep in extract_paths:
+        _add_candidate(ep)
     
     # 第二步：按产品名分组，同产品的保单和PDF都按年龄排序，一一对应
     # 先按产品代码分组保单
@@ -925,9 +1005,18 @@ def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟
         for pdf_info in pdf_info_list:
             print(f"  PDF: {pdf_info['product_name']} ({pdf_info['product_code']}), {pdf_info['age']}岁{pdf_info['gender']}, 受保人={pdf_info['insured_name']}")
         
-        # 第一步：优先按受保人名字匹配
+        # 第0步：按文件名精确配对（保单计划书原件，最可靠）
         file_path = None
-        if insured_name:
+        p_filename = os.path.basename(p.get("filename") or "").lower()
+        if p_filename:
+            for pdf_info in pdf_info_list:
+                if os.path.basename(pdf_info.get("filename") or "").lower() == p_filename:
+                    file_path = pdf_info['path']
+                    print(f"  文件名匹配成功: {pdf_info['path']}")
+                    break
+
+        # 第一步：优先按受保人名字匹配
+        if not file_path and insured_name:
             for pdf_info in pdf_info_list:
                 if pdf_info['insured_name'] and insured_name in pdf_info['insured_name']:
                     file_path = pdf_info['path']
@@ -1018,8 +1107,8 @@ def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟
             ("缴费编号", p.get("billing_number", "—")),
             ("保障额", f"${p['sum_assured']:,.0f}" if p.get("sum_assured") else "—"),
             ("年缴保费", f"${p['annual_premium']:,.2f}" if p.get("annual_premium") else "—"),
-            ("供款期", f"{p['pay_years']}年" if p.get("pay_years") else "—"),
-            ("剩余缴费", f"{p['remaining_pay_years']}年" if p.get("remaining_pay_years") and p['remaining_pay_years'] > 0 else "缴费期满"),
+            ("供款期", _pay_label(p)),
+            ("剩余缴费", _remain_label(p)),
         ]
         rows = len(info_items)
         table_shape = slide.shapes.add_table(rows, 2, Inches(0.3), Inches(0.7),
@@ -1040,27 +1129,41 @@ def generate_family_review_ppt(policies, client_name="", advisor_name="武安孟
             max_h = Inches(7.5)
 
             if file_path:
-                # 第6页，自动检测裁剪区域
-                import fitz
-                doc = fitz.open(file_path)
-                page = doc[5]  # 第6页
-                # 找所有长水平线（只找上边界以下的）
-                title_rects = page.search_for('基本計劃')
-                title_rects.sort(key=lambda r: r.y0)
-                top_y = title_rects[0].y0 - 10 if title_rects else 50
-                h_lines = []
-                for draw in page.get_drawings():
-                    for item in draw['items']:
-                        if item[0] == 'l':
-                            p1 = item[1]
-                            p2 = item[2]
-                            if abs(p1.y - p2.y) < 2 and p2.x - p1.x > 400 and p1.y > top_y:
-                                h_lines.append(p1.y)
-                h_lines.sort()
-                bottom_y = h_lines[-1] + 5 if h_lines else 680
-                clip = (20, top_y, 580, bottom_y)
-                doc.close()
-                img = _pdf_page_to_image(file_path, 5, clip=clip)
+                import os as _os
+                ext = _os.path.splitext(file_path)[1].lower()
+                if ext in (".jpg", ".jpeg", ".png", ".bmp", ".webp"):
+                    # OCR上传的图片原件：直接作为配图，不按PDF第6页裁剪
+                    from PIL import Image as PILImage
+                    img = PILImage.open(file_path).convert("RGB")
+                elif ext in (".html", ".htm"):
+                    # 保单详情HTML：用 Chromium 全页截图作为配图
+                    try:
+                        img = _html_to_image(file_path)
+                    except Exception as e:
+                        print(f"HTML截图失败 {file_path}: {e}")
+                        img = None
+                else:
+                    # 第6页，自动检测裁剪区域
+                    import fitz
+                    doc = fitz.open(file_path)
+                    page = doc[5]  # 第6页
+                    # 找所有长水平线（只找上边界以下的）
+                    title_rects = page.search_for('基本計劃')
+                    title_rects.sort(key=lambda r: r.y0)
+                    top_y = title_rects[0].y0 - 10 if title_rects else 50
+                    h_lines = []
+                    for draw in page.get_drawings():
+                        for item in draw['items']:
+                            if item[0] == 'l':
+                                p1 = item[1]
+                                p2 = item[2]
+                                if abs(p1.y - p2.y) < 2 and p2.x - p1.x > 400 and p1.y > top_y:
+                                    h_lines.append(p1.y)
+                    h_lines.sort()
+                    bottom_y = h_lines[-1] + 5 if h_lines else 680
+                    clip = (20, top_y, 580, bottom_y)
+                    doc.close()
+                    img = _pdf_page_to_image(file_path, 5, clip=clip)
             else:
                 img = None
 

@@ -277,12 +277,14 @@ async def family_parse_image(files: List[UploadFile] = File(...)):
 @app.post("/api/family-review-export-ppt")
 async def family_review_export_ppt(
     policies: str = Form(...),
+    policy_files: List[UploadFile] = File(default=[]),
     extract_files: List[UploadFile] = File(default=[]),
     shot_files: List[UploadFile] = File(default=[])
 ):
     """生成家庭保单检视PPT。
     FormData:
       - policies: JSON字符串，保单列表
+      - policy_files: 保单计划书原件列表（PDF/图片，详情页按文件名配对截图）
       - extract_files: 提取方案文件列表（PDF/图片）
       - shot_files: 财务概览文件列表（PDF/图片）
     返回：pptx 文件下载
@@ -296,6 +298,15 @@ async def family_review_export_ppt(
 
         # 保存提取方案文件到临时目录（保留原始文件名，排序要靠文件名里的「第N年提取」）
         import tempfile, os, uuid
+        policy_paths = []
+        for f in policy_files:
+            data = await f.read()
+            name = os.path.basename(f.filename or "") or "plan.pdf"
+            save_path = os.path.join(tempfile.gettempdir(), f"up_plan_{uuid.uuid4().hex[:8]}_{name}")
+            with open(save_path, "wb") as fp:
+                fp.write(data)
+            policy_paths.append({"path": save_path, "filename": name})
+
         extract_paths = []
         for f in extract_files:
             data = await f.read()
@@ -318,7 +329,8 @@ async def family_review_export_ppt(
         buf = family_review_export.generate_family_review_ppt(
             policies_list,
             extract_paths=extract_paths,
-            shot_paths=shot_paths
+            shot_paths=shot_paths,
+            policy_paths=policy_paths
         )
         filename = "家庭保单检视.pptx"
         from urllib.parse import quote

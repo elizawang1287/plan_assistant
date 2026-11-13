@@ -10,6 +10,7 @@
 说明：基于数字版 PDF 文字层提取；若为扫描图片版则文字层为空，需另接 OCR。
 """
 import re
+import datetime
 import fitz  # PyMuPDF
 
 PRODUCT_NAMES = {
@@ -101,6 +102,13 @@ PRODUCT_CONFIG = {
         "extra_years": set(),
         "breakeven_year": None,
     },
+    "PMP": {
+        "keywords": ["PMP", "醫療加倍保", "医疗加倍保"],
+        "category": "医疗",
+        "render_type": "medical",
+        "extra_years": set(),
+        "breakeven_year": None,
+    },
     "CIT2": {
         "keywords": ["CIT2", "守護健康危疾定期保II", "守护健康危疾定期保II"],
         "category": "定期危疾",
@@ -118,6 +126,22 @@ ANB = re.compile(r"@?ANB\s*(\d+)\s*歲")
 
 def _to_num(s):
     return float(s.replace(",", ""))
+
+
+def _elapsed_since_eff(eff_year, eff_month, eff_day):
+    """按生效日算已缴年数：生效当天计 1 年，每过一个生效周年再加 1（满周年当天为 2 年）。
+    取不到完整生效日返回 None。"""
+    if not eff_year:
+        return None
+    today = datetime.date.today()
+    try:
+        eff = datetime.date(int(eff_year), int(eff_month or 1), int(eff_day or 1))
+    except ValueError:
+        return None
+    diff = today.year - eff.year
+    if (today.month, today.day) < (eff.month, eff.day):
+        diff -= 1
+    return max(1, diff + 1)
 
 
 def extract_text(pdf_path):
@@ -1201,6 +1225,7 @@ FAMILY_PRODUCT_NAMES = {
     "CIE3": "CIE3 守护健康危疾加护保III",
     "CIP2": "CIP2 危疾首护保险计划II",
     "ENCASH": "ENCASH 加护一生住院现金",
+    "PMP": "PMP 医疗加倍保",
     "PLT20": "PLT20 守护家人定期寿险",
     "PLT10": "PLT10 守护家人定期寿险（10年续保）",
     "PLT5": "PLT5 守护家人定期寿险（5年续保）",
@@ -1236,6 +1261,7 @@ FAMILY_PRODUCT_CATEGORY = {
     "CPER": "医疗",
     "MCVIP": "医疗",
     "VIP": "医疗",
+    "PMP": "医疗",
     "LFRE2": "储蓄/寿险",
     "PLP2": "储蓄/寿险",
 }
@@ -1263,6 +1289,8 @@ def detect_product_family(text):
         if "(PLT20)" in text or "（PLT20）" in text: return "PLT20"
         return "PLT20"  # 默认
     # 先按括号里的产品代码区分 VIP / MCVIP
+    if "(PMP)" in text or "醫療加倍保" in text or "医疗加倍保" in text:
+        return "PMP"
     if "(MCVIP)" in text or "高端醫療自由行" in text or "高端医疗自由行" in text:
         return "MCVIP"
     if "(VIP)" in text or "自願醫保尚賓" in text or "自愿医保尚宾" in text:
@@ -1296,7 +1324,7 @@ def parse_basic_from_text(text):
         "category": FAMILY_PRODUCT_CATEGORY.get(product, "其他"),
         "age": None, "gender": None, "currency": None,
         "sum_assured": None, "annual_premium": None,
-        "pay_years": None, "total_premium": None,
+        "pay_years": None, "pay_term": None, "total_premium": None,
         "last_surrender_value": None,
         "rider_name": None,
         "rider_premium": None,
@@ -1413,6 +1441,7 @@ def parse_basic_from_text(text):
     # 供款年期（繁简都支持）
     # PDF文本里"保費供款年期"是表头，值在后面几行，不是同一行
     pay_years = None
+    pay_term = None
     for line_pat in [r"保[費费]供款年期", r"保费供款年期"]:
         m = re.search(line_pat, text)
         if m:
@@ -1426,16 +1455,20 @@ def parse_basic_from_text(text):
                     pay_years = val
                     break
     # 兜底：一次整付产品（PRMESP）供款期是1年
-    if not pay_years:
-        if product in ("PRMESP",):
-            pay_years = 1
+    if not pay_years and product in ("PRMESP",):
+        pay_years = 1
+    # 终身缴交的医疗险（医疗类且未取到数字缴费年期）：供款期按终身，不计算总保费
+    medical_codes = {"PMP", "MCVIP", "VIP", "CPER"}
+    if not pay_years and product in medical_codes:
+        pay_term = "终身"
     info["pay_years"] = pay_years
+    info["pay_term"] = pay_term
 
-    # 总保费
-    if info["annual_premium"] and info["pay_years"]:
-        info["total_premium"] = info["annual_premium"] * info["pay_years"]
-    elif info["annual_premium"]:
-        info["total_premium"] = info["annual_premium"]
+    # 总保费：仅数字供款期用 年保费×供款年数；终身缴交/无固定供款期留空，不退化成年保费
+    if info["annual_premium"] and isinstance(pay_years, int):
+        info["total_premium"] = info["annual_premium"] * pay_years
+    else:
+        info["total_premium"] = None
 
     # 储蓄险产品：提取最后剩余价值
     savings_products = {"TRST", "PRMESP", "LFRE2", "PLP2"}
@@ -1476,6 +1509,7 @@ def parse_policy_detail_from_text(text):
         "sum_assured": None,
         "annual_premium": None,
         "pay_years": None,
+        "pay_term": None,
         "total_premium": None,
         "remaining_pay_years": None,
         "first_10y_bonus": None,
@@ -1506,6 +1540,11 @@ def parse_policy_detail_from_text(text):
             info["product_name"] = FAMILY_PRODUCT_NAMES.get(info["product_code"], info["product_code"])
 
     # 产品分类
+    if not info["product_code"]:
+        # 兜底关键词：未提取到括号代码时按计划名识别
+        if "醫療加倍保" in text or "医疗加倍保" in text:
+            info["product_code"] = "PMP"
+            info["product_name"] = FAMILY_PRODUCT_NAMES.get("PMP", "PMP 医疗加倍保")
     if info["product_code"]:
         info["category"] = FAMILY_PRODUCT_CATEGORY.get(info["product_code"], "其他")
 
@@ -1587,7 +1626,11 @@ def parse_policy_detail_from_text(text):
     # 兜底：一次缴清
     if not pay_years and pay_mode == "SINGLE":
         pay_years = 1
+    # 终身缴交的医疗险：未取到数字供款期，按终身处理
+    medical_codes = {"PMP", "MCVIP", "VIP", "CPER"}
+    pay_term = "终身" if (not pay_years and info["product_code"] in medical_codes) else None
     info["pay_years"] = pay_years
+    info["pay_term"] = pay_term
 
     # ===== 在「遞增保障權益選擇詳情」表格里提取 =====
     # 这个表格里才有保障额和每期保费
@@ -1634,18 +1677,16 @@ def parse_policy_detail_from_text(text):
     info["annual_premium"] = annual_premium
 
     # 总保费
-    if annual_premium and pay_years:
+    if annual_premium and isinstance(pay_years, int):
         info["total_premium"] = annual_premium * pay_years
-    elif annual_premium:
-        info["total_premium"] = annual_premium
+    else:
+        info["total_premium"] = None
 
-    # 剩余缴费年期 = 总供款期 - 已缴年数
-    if pay_years and effective_year:
-        elapsed_years = 2026 - effective_year  # 以2026年为检视时点
-        remaining = pay_years - elapsed_years
-        if remaining < 0:
-            remaining = 0
-        info["remaining_pay_years"] = remaining
+    # 剩余缴费年期 = 总供款期 - 已缴年数（生效当天计 1 年，每过一个周年 +1）
+    if pay_years and eff_year:
+        elapsed_years = _elapsed_since_eff(eff_year, eff_month, eff_day)
+        if elapsed_years is not None:
+            info["remaining_pay_years"] = max(0, pay_years - elapsed_years)
 
     return info
 
