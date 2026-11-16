@@ -8,9 +8,12 @@ import json
 import re
 import tempfile
 import os
+import hmac
+import hashlib
+from urllib.parse import quote
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
@@ -21,14 +24,79 @@ import ppt_export
 
 app = FastAPI(title="计划书助手")
 
-# 允许跨域（junrong-team.pages.dev 访问）
+# ===== 全站口令登录（与 junrong 站点同一套机制，口令由环境变量 SITE_PASSWORD 决定）=====
+SITE_PASSWORD = os.environ.get("SITE_PASSWORD", "fusion888")
+AUTH_SALT = "fusion-auth-v1"
+COOKIE_NAME = "fusion_auth"
+COOKIE_MAX_AGE = 60 * 60 * 24 * 30  # 30 天
+
+# 不需要登录也能访问：登录页、登录接口、健康检查、团队业绩目标读写（由 junrong 看板跨域调用）
+AUTH_WHITELIST_EXACT = {"/login.html", "/api/login", "/api/health", "/api/targets"}
+
+
+def auth_token(pwd: str) -> str:
+    return hmac.new(pwd.encode("utf-8"), AUTH_SALT.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+@app.middleware("http")
+async def auth_guard(request: Request, call_next):
+    path = request.url.path
+    if path in AUTH_WHITELIST_EXACT or path.startswith("/assets") or path == "/favicon.ico":
+        return await call_next(request)
+
+    cookie = request.cookies.get(COOKIE_NAME) or ""
+    if hmac.compare_digest(cookie, auth_token(SITE_PASSWORD)):
+        return await call_next(request)
+
+    if path.startswith("/api"):
+        return JSONResponse({"error": "未登录，请先访问站点登录"}, status_code=401)
+    return RedirectResponse(f"/login.html?next={quote(path)}", status_code=302)
+
+
+@app.post("/api/login")
+async def login(request: Request):
+    """口令校验，通过后下发签名 cookie"""
+    payload: dict = {}
+    try:
+        payload = await request.json()
+    except Exception:
+        pass
+    pwd = str((payload or {}).get("password") or "")
+    if not pwd or not hmac.compare_digest(pwd, SITE_PASSWORD):
+        return JSONResponse({"error": "密码错误"}, status_code=401)
+
+    resp = JSONResponse({"status": "ok"})
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    resp.set_cookie(
+        COOKIE_NAME,
+        auth_token(SITE_PASSWORD),
+        max_age=COOKIE_MAX_AGE,
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=(proto == "https"),
+    )
+    return resp
+
+
+# 允许跨域（junrong 团队看板访问）；只放行自有域名
+_cors_env = os.environ.get("CORS_ORIGINS", "")
+ALLOW_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()] or [
+    "https://junrong-team.vercel.app",
+    "https://junrong-team.pages.dev",
+    "http://localhost:8010",
+    "http://127.0.0.1:8010",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 生产环境可以改成具体域名
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=ALLOW_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 

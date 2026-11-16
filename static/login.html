@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>访问验证 · 计划书助手</title>
+<style>
+  :root{--pr:#b01c2e;}
+  *{box-sizing:border-box;}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+       background:linear-gradient(135deg,#f7f8fa 0%,#eceef2 100%);
+       font-family:-apple-system,BlinkMacSystemFont,"PingFang HK","Microsoft YaHei",sans-serif;color:#222;}
+  .card{width:min(92vw,380px);background:#fff;border-radius:16px;padding:32px 28px 26px;
+        box-shadow:0 10px 30px rgba(0,0,0,.08);text-align:center;}
+  .logo{width:56px;height:56px;border-radius:14px;background:var(--pr);margin:0 auto 18px;
+        display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700;}
+  h1{font-size:20px;margin:0 0 6px;font-weight:700;}
+  .sub{font-size:13px;color:#8a8f99;margin:0 0 22px;line-height:1.6;}
+  input{width:100%;padding:12px 14px;font-size:15px;border:1px solid #d8dce2;border-radius:10px;outline:none;transition:.2s;}
+  input:focus{border-color:var(--pr);box-shadow:0 0 0 3px rgba(176,28,46,.1);}
+  button{width:100%;margin-top:14px;padding:12px;font-size:15px;font-weight:600;border:none;border-radius:10px;
+         background:var(--pr);color:#fff;cursor:pointer;transition:.2s;}
+  button:hover{background:#961726;}
+  button:disabled{opacity:.6;cursor:not-allowed;}
+  .err{color:#d32f2f;font-size:13px;margin-top:12px;min-height:18px;}
+  .foot{font-size:11px;color:#b0b5bd;margin-top:18px;line-height:1.6;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">保</div>
+    <h1>计划书助手</h1>
+    <p class="sub">请输入访问密码<br>使用后 30 天内免密登录</p>
+    <form id="f">
+      <input type="password" id="pwd" placeholder="访问密码" autocomplete="current-password" autofocus>
+      <button type="submit" id="btn">进入</button>
+    </form>
+    <div class="err" id="err"></div>
+    <div class="foot">本系统仅限团队内部使用</div>
+  </div>
+<script>
+  var next = (new URLSearchParams(location.search)).get('next') || '/';
+  var form = document.getElementById('f'), pwd = document.getElementById('pwd');
+  var btn = document.getElementById('btn'), err = document.getElementById('err');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var v = pwd.value.trim();
+    if (!v) { err.textContent = '请输入密码'; return; }
+    btn.disabled = true; btn.textContent = '验证中…'; err.textContent = '';
+    fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: v })
+    }).then(function (r) {
+      if (r.ok) {
+        location.replace(next.indexOf('/') === 0 ? next : '/');
+      } else {
+        err.textContent = '密码错误，请重试';
+        btn.disabled = false; btn.textContent = '进入'; pwd.select();
+      }
+    }).catch(function () {
+      err.textContent = '网络异常，请重试';
+      btn.disabled = false; btn.textContent = '进入';
+    });
+  });
+</script>
+</body>
+</html>
