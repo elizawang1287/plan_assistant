@@ -11,6 +11,7 @@
 """
 import re
 import datetime
+import collections
 import fitz  # PyMuPDF
 
 PRODUCT_NAMES = {
@@ -25,6 +26,7 @@ PRODUCT_NAMES = {
     "PHOR": "诚誉财富保险计划",
     "PACE": "骏誉财富保险计划",
     "CIT2": "守护健康危疾定期保II",
+    "PVPP": "雍誉非凡终身寿险",
 }
 
 # 产品配置表：集中管理所有产品的属性
@@ -114,6 +116,13 @@ PRODUCT_CONFIG = {
         "category": "定期危疾",
         "render_type": "term",
         "extra_years": set(),
+        "breakeven_year": None,
+    },
+    "PVPP": {
+        "keywords": ["PVPP", "雍譽非凡", "雍誉非凡"],
+        "category": "终身寿险",
+        "render_type": "savings",
+        "extra_years": {1, 13, 26, 41, 56, 71},
         "breakeven_year": None,
     },
 }
@@ -1045,6 +1054,281 @@ def parse_optimistic(text, anb_age):
     return out
 
 
+# ============ PVPP 雍誉非凡终身寿险（整付 · 分红终身寿）============
+# 该产品计划书的数字按列竖排（同一列 36 个数值被合并成一个文本块），
+# 通用行解析会错位，故用坐标（y 聚行、x 排序）重建表格。
+# 全部为本产品专用函数，不修改也不复用其他产品的行解析，避免互相影响。
+
+def _pvpp_page_lines(page, tol=2.0):
+    """按 y 坐标把 words 聚成行，行内按 x 排序，返回 token 列表的列表。"""
+    buckets = {}
+    for w in page.get_text("words"):
+        t = w[4].strip()
+        if not t:
+            continue
+        key = round(w[1] / tol)
+        buckets.setdefault(key, []).append((w[0], t))
+    return [[t for _, t in sorted(v)] for k, v in sorted(buckets.items())]
+
+
+def _pvpp_num(tok):
+    if NUM.match(tok) or VAL.match(tok):
+        try:
+            return float(tok.replace(",", ""))
+        except ValueError:
+            return None
+    return None
+
+
+def _pvpp_split_row(tokens):
+    """识别一行数据，返回 (year, age, values)。
+    行首为 1-120 的整数 → 保单年度；'@ANB' + '56歲' → 年龄标记行。"""
+    if not tokens:
+        return None
+    head = tokens[0].strip()
+    head_u = head.upper()
+    if PLAIN_NUM.match(head) and 1 <= int(head) <= 120:
+        vals = [_pvpp_num(t) for t in tokens[1:]]
+        if vals and all(v is not None for v in vals):
+            return int(head), None, vals
+        return None
+    if head_u in ("@ANB", "ANB") and len(tokens) >= 2:
+        m = re.match(r"(\d{1,3})\s*[歲岁]", tokens[1].strip())
+        if m:
+            vals = [_pvpp_num(t) for t in tokens[2:]]
+            if vals and all(v is not None for v in vals):
+                return None, int(m.group(1)), vals
+    return None
+
+
+def _pvpp_basic_extra(pages):
+    """从建议书摘要页取受保人/保费信息（该产品摘要页版式与其他产品不同，单独取）。"""
+    extra = {}
+    for page in pages:
+        txt = page.get_text()
+        if "建議書摘要" not in txt.replace("说", "說"):
+            continue
+        for tokens in _pvpp_page_lines(page):
+            joined = " ".join(tokens)
+            if "翌年歲（ANB）" in joined or "翌年岁（ANB）" in joined:
+                for t in tokens:
+                    m = re.match(r"(\d{1,3})\s*[歲岁]", t.strip())
+                    if m:
+                        extra["anb_age"] = int(m.group(1))
+                for t in tokens:
+                    if "性別" in t or "性別：" in t:
+                        g = t.replace("性別：", "").replace("性别：", "").strip()
+                        if g in ("男", "女"):
+                            extra["gender"] = g
+                if "gender" not in extra:
+                    for i, t in enumerate(tokens):
+                        if "性別" in t and i + 1 < len(tokens):
+                            if tokens[i + 1].strip() in ("男", "女"):
+                                extra["gender"] = tokens[i + 1].strip()
+            if "風險級別" in joined or "风险级别" in joined:
+                for i, t in enumerate(tokens):
+                    if ("風險級別" in t or "风险级别" in t) and i + 1 < len(tokens):
+                        v = tokens[i + 1].strip()
+                        if "吸煙" in v or "吸烟" in v:
+                            extra["risk_class"] = v
+                            extra["smoker"] = "非吸烟" if ("非" in v or "不" in v) else "吸烟"
+            if "終身" in joined and "(PVPP)" in joined:
+                nums = [x for x in tokens if NUM.match(x.strip()) or re.match(r"^\d{1,3}(,\d{3})+\.\d{2}$", x.strip())]
+                if len(nums) >= 2:
+                    extra["basic_amount"] = float(nums[0].replace(",", ""))
+                    extra["total_premium"] = float(nums[1].replace(",", ""))
+                    extra["annual_premium"] = extra["total_premium"]
+            if "保費供款年期" in joined and ("1" in tokens):
+                extra["pay_years"] = 1
+        if extra:
+            break
+    return extra
+
+
+def parse_pvpp(pdf_path, basic):
+    """解析 PVPP 雍誉非凡终身寿险。
+    产出：
+      rows       不做提取的退保价值 + 身故赔偿（36 个节点：年度 1-25、30、ANB 56-101）
+      withdrawal 现金价值提取方案（第 20 年起每年提取固定金额，含提取构成概览）
+      basic_extra 受保人 / 保费 / 保额
+    """
+    doc = fitz.open(pdf_path)
+    pages = list(doc)
+    anb = basic.get("anb_age")
+    total_premium = basic.get("total_premium")
+    annual_premium = basic.get("annual_premium")
+    pay_years = basic.get("pay_years")
+
+    basic_extra = _pvpp_basic_extra(pages)
+    if not anb:
+        anb = basic_extra.get("anb_age")
+    if not total_premium:
+        total_premium = basic_extra.get("total_premium")
+    if not annual_premium:
+        annual_premium = basic_extra.get("annual_premium") or total_premium
+    if not pay_years:
+        pay_years = basic_extra.get("pay_years") or 1
+
+    raw_rows, raw_wd, raw_wd_death, overview = [], [], [], {}
+
+    # 表格页按「数值结构」识别，不依赖被换行拆开的标题文字：
+    #   7 个数值行且 保证+非保证=总额（退保 & 身故两处同时成立）→ 基本计划说明摘要
+    #   8 个数值行且 提取保证+非保证=提取总额 → 现金价值提取表（退保价值版 / 身故赔偿版）
+    pages8 = []   # [(page_no, [(year, age, vals)])]
+    for page in pages:
+        lines = _pvpp_page_lines(page)
+
+        # 提取概览页的三项总额（该页只有三组数字，单独按标签抓）
+        for tokens in lines:
+            joined = " ".join(tokens)
+            if "提取之總額" in joined or "退保價值總額" in joined or "身故賠償總額" in joined:
+                nums = [_pvpp_num(t) for t in tokens[1:] if _pvpp_num(t) is not None]
+                if len(nums) >= 3:
+                    if "提取之總額" in joined:
+                        overview["total_guaranteed"] = nums[0]
+                        overview["total_non_guaranteed"] = nums[1]
+                        overview["total"] = nums[2]
+                    elif "退保價值總額" in joined:
+                        overview["final_surrender_guaranteed"] = nums[0]
+                        overview["final_surrender_non_guaranteed"] = nums[1]
+                        overview["final_surrender"] = nums[2]
+                    else:
+                        overview["final_death_guaranteed"] = nums[0]
+                        overview["final_death_non_guaranteed"] = nums[1]
+                        overview["final_death"] = nums[2]
+
+        cand7, cand8 = [], []
+        for tokens in lines:
+            parsed = _pvpp_split_row(tokens)
+            if not parsed:
+                continue
+            year, age, vals = parsed
+            if (len(vals) == 7 and abs(vals[1] + vals[2] - vals[3]) <= 1
+                    and abs(vals[4] + vals[5] - vals[6]) <= 1):
+                cand7.append((year, age, vals))
+            elif len(vals) == 8 and abs(vals[1] + vals[2] - vals[3]) <= 1:
+                cand8.append((year, age, vals))
+
+        if len(cand7) >= 20:
+            for year, age, vals in cand7:
+                y = year if year else (age - anb if (age and anb) else None)
+                raw_rows.append({
+                    "year": y,
+                    "age": age if age else ((anb + y) if (anb and y) else None),
+                    "paid": vals[0], "guaranteed": vals[1], "bonus": vals[2], "surrender": vals[3],
+                    "death_guaranteed": vals[4], "death_bonus": vals[5], "death_total": vals[6],
+                    "is_age_marker": age is not None,
+                })
+        elif len(cand8) >= 10:
+            pages8.append((page.number, cand8))
+
+    # 提取表分若干页：退保价值版与身故赔偿版各占一半，同一批年度里退保保证额必然小于身故保证额，
+    # 故按「保证额之和」升序切半区分两个版本（不依赖文字）
+    if pages8:
+        ranked = sorted(pages8, key=lambda pr: sum(v[5] for _, _, v in pr[1]))
+        half = max(1, len(ranked) // 2)
+        sur_pages = ranked[:half] if len(ranked) > 1 else ranked
+        death_pages = ranked[half:] if len(ranked) > 1 else []
+        for _pno, prows in sur_pages:
+            for year, age, vals in prows:
+                y = year if year else (age - anb if (age and anb) else None)
+                raw_wd.append({
+                    "year": y,
+                    "age": age if age else ((anb + y) if (anb and y) else None),
+                    "paid": vals[0], "wd_guaranteed": vals[1], "wd_bonus": vals[2],
+                    "withdrawal": vals[3], "sum_assured": vals[4],
+                    "surrender_guaranteed": vals[5], "surrender_bonus": vals[6], "surrender": vals[7],
+                    "is_age_marker": age is not None,
+                })
+        for _pno, prows in death_pages:
+            for year, age, vals in prows:
+                y = year if year else (age - anb if (age and anb) else None)
+                raw_wd_death.append({
+                    "year": y, "age": age,
+                    "death_guaranteed": vals[5], "death_bonus": vals[6], "death_total": vals[7],
+                })
+
+    doc.close()
+
+    # ---- 去重 + 排序（同一节点可能因页面重复出现）----
+    def _dedupe(items):
+        out, seen = [], set()
+        for r in items:
+            key = (r["year"], r["age"])
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(r)
+        out.sort(key=lambda r: (r["year"] if r["year"] else (r["age"] - (anb or 0) if r["age"] else 999)))
+        return out
+
+    rows = _dedupe(raw_rows)
+    wd_rows = _dedupe(raw_wd)
+
+    # ---- 指标（单利/复利/倍数）复用通用 compute_metrics，字段结构一致 ----
+    rows = [compute_metrics(r, total_premium, annual_premium, pay_years) for r in rows]
+
+    # ---- 提取方案：结构对齐其他产品的 withdrawal（前端可直接复用渲染）----
+    withdrawal = None
+    if wd_rows:
+        # 合并身故赔偿（提取后）
+        death_map = {r["year"]: r for r in raw_wd_death if r["year"]}
+        accum = 0.0
+        w_rows = []
+        for r in wd_rows:
+            accum += r["withdrawal"]
+            item = {
+                "year": r["year"], "age": r["age"],
+                "withdrawal": r["withdrawal"], "surrender": r["surrender"],
+                "accumulated": round(accum, 2),
+                "surrender_guaranteed": r["surrender_guaranteed"],
+                "surrender_bonus": r["surrender_bonus"],
+                "sum_assured": r["sum_assured"],
+                "is_age_marker": r["is_age_marker"],
+            }
+            d = death_map.get(r["year"])
+            if d:
+                item["death_total"] = d["death_total"]
+            w_rows.append(item)
+
+        paying = [r for r in wd_rows if r["withdrawal"] > 0]
+        start_year = paying[0]["year"] if paying else None
+        # 每年提取额：取出现最多的金额（正常方案为固定金额）
+        amounts = collections.Counter([round(r["withdrawal"], 2) for r in paying])
+        annual_wd = amounts.most_common(1)[0][0] if amounts else None
+        total_wd = round(sum(r["withdrawal"] for r in paying), 2)
+        total_wd_g = round(sum(r["wd_guaranteed"] for r in paying), 2)
+        total_wd_b = round(sum(r["wd_bonus"] for r in paying), 2)
+
+        ov = dict(overview)
+        ov.setdefault("total", total_wd)
+        ov.setdefault("total_guaranteed", total_wd_g)
+        ov.setdefault("total_non_guaranteed", total_wd_b)
+        ov["withdraw_years"] = len(paying)
+        last = w_rows[-1]
+        ov.setdefault("final_surrender", last["surrender"])
+        ov.setdefault("final_surrender_guaranteed", last["surrender_guaranteed"])
+        ov.setdefault("final_surrender_non_guaranteed", last["surrender_bonus"])
+        ov["final_age"] = last["age"]
+        if last.get("death_total"):
+            ov.setdefault("final_death", last["death_total"])
+
+        withdrawal = {
+            "start_year": start_year,
+            "annual_withdrawal": annual_wd,
+            "rows": w_rows,
+            "overview": ov,
+        }
+
+    return {
+        "basic_extra": basic_extra,
+        "rows": rows,
+        "withdrawal": withdrawal,
+        "optimistic": {},
+        "product_advantage": None,
+    }
+
+
 def parse_pdf(pdf_path):
     text = extract_text(pdf_path)
     product = detect_product(text)
@@ -1183,6 +1467,14 @@ def parse_pdf(pdf_path):
         product_advantage = None
         withdrawal = None
         optimistic = {}
+    elif product == "PVPP":
+        # 雍誉非凡终身寿险：坐标法专用解析（不退保/身故表 + 现金价值提取方案）
+        pv = parse_pvpp(pdf_path, basic)
+        basic.update(pv["basic_extra"])
+        rows = pv["rows"]
+        withdrawal = pv["withdrawal"]
+        optimistic = pv["optimistic"]
+        product_advantage = pv["product_advantage"]
     else:
         rows = parse_surrender_table(text, basic.get("anb_age"),
                                      basic.get("total_premium"), product=product)
@@ -1240,6 +1532,7 @@ FAMILY_PRODUCT_NAMES = {
     "PLP2": "PLP2 美好人寿II",
     "PHOR": "PHOR 诚誉财富保险计划",
     "PACE": "PACE 骏誉财富保险计划",
+    "PVPP": "PVPP 雍誉非凡终身寿险",
 }
 
 FAMILY_PRODUCT_CATEGORY = {
@@ -1264,6 +1557,7 @@ FAMILY_PRODUCT_CATEGORY = {
     "PMP": "医疗",
     "LFRE2": "储蓄/寿险",
     "PLP2": "储蓄/寿险",
+    "PVPP": "终身寿险",
 }
 
 
