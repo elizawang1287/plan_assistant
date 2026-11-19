@@ -111,7 +111,7 @@
   <div class="drop" id="drop">
     <div style="font-size:30px;">⬆</div>
     <div><b>点击添加</b> 或拖入计划书 PDF（可一份份加）</div>
-    <div class="hint">支持 世誉财富PRMESP / 信守明天TRST / 加护一生ENCASH / 美好人生PLP2 / 自主未来LFRE2 / 危疾CIM3·CIE3·CIP2 / 定期寿险PLT系列 / 定期重疾CIT2 / 雍誉非凡PVPP · 数字版 PDF</div>
+    <div class="hint">支持 世誉财富PRMESP / 信守明天TRST / 加护一生ENCASH / 美好人生PLP2 / 自主未来LFRE2 / 危疾CIM3·CIE3·CIP2 / 定期寿险PLT系列 / 定期重疾CIT2 / 雍誉非凡PVPP / 雍誉终身PVP · 数字版 PDF</div>
     <button class="btn btn-primary" id="btnAdd" style="margin-top:12px;">＋ 添加PDF</button>
   </div>
   <input type="file" id="file" accept=".pdf" multiple hidden>
@@ -309,8 +309,8 @@ const EXTRA_ROWS_YEARS = {TRST:[8], PRMESP:[4], CIM3:[1], CIE3:[1], CIP2:[1]};
 const BREAKEVEN_YEARS = {TRST:8, PRMESP:4};
 function pickRows(rows, productCode){
   if (!rows || rows.length === 0) return [];
-  // 终身寿险（PVPP）：计划书列示的 36 个年度节点全部呈现，不做抽样
-  if (productCode === 'PVPP') return rows.slice();
+  // 终身寿险（PVPP 雍誉非凡 / PVP 雍誉终身）：计划书列示的年度节点全部呈现，不做抽样
+  if (productCode === 'PVPP' || productCode === 'PVP') return rows.slice();
   const extra = new Set(EXTRA_ROWS_YEARS[productCode] || []);
   // 判断是否为断档表：岁数标记行不在最后一行才算（完整表最后一行也是101岁标记）
   const lastYear = rows[rows.length-1].year;
@@ -441,17 +441,20 @@ function render(data, fname){
       </table>
     </div>`;
 
-  // PLP2/LFRE2/PVPP：身故赔偿表
+  // PLP2/LFRE2/PVPP/PVP：身故赔偿表
   const isPlp2 = data.product_code === 'PLP2';
   const isLfre2 = data.product_code === 'LFRE2';
   const isPvpp = data.product_code === 'PVPP';
+  const isPvp = data.product_code === 'PVP';
   let deathSection = '';
-  if (isPlp2 || isLfre2 || isPvpp) {
-    const deathDesc = isPvpp
+  if (isPlp2 || isLfre2 || isPvpp || isPvp) {
+    const deathDesc = isPvp
+      ? '整付保费换终身身故保障：保证身故赔偿 + 非保证终期红利（第15个保单周年起派发）。保证身故赔偿自66岁(ANB)保单周年与第15个保单周年之较后者起，每个保单周年递减保额的3.3%，至保额50.5%后恒定。身故赔偿与退保价值属不同情形，不可相加；杠杆＝预计身故赔偿÷累计已缴保费。'
+      : (isPvpp
       ? '整付保费换终身身故保障：保证身故赔偿 + 非保证终期红利。身故赔偿与退保价值属不同情形，不可相加；杠杆＝预计身故赔偿÷累计已缴保费。'
       : (isPlp2
       ? '首20年额外身故保障为基本保额的100%；第21-29年每年递减10%；第30年起额外保障归零。'
-      : '保证身故保障终身，另加非保证终期红利。');
+      : '保证身故保障终身，另加非保证终期红利。'));
     const deathHtml = rows.map(r=>{
       if (!r.death_total) return '';
       const leverage = r.paid > 0 ? (r.death_total / r.paid).toFixed(2) + '倍' : '/';
@@ -622,7 +625,7 @@ function render(data, fname){
     (y20?`第20个保单年度（${y20.age}岁）预计退保价值${fmt(y20.surrender)}${cur}；`:'')+
     (last?`至${last.age}岁预计退保价值${fmt(last.surrender)}${cur}。`:'');
   }
-  if (data.product_code === 'PVPP' && rows.length) {
+  if ((data.product_code === 'PVPP' || data.product_code === 'PVP') && rows.length) {
     const d0 = rows[0], dl = rows[rows.length - 1];
     if (d0 && d0.death_total && d0.paid) {
       summary += `身故保障终身有效：首年预计身故赔偿${fmt(d0.death_total)}${cur}（约为已缴保费的${(d0.death_total / d0.paid).toFixed(2)}倍），至${dl.age}岁预计${fmt(dl.death_total)}${cur}；`;
