@@ -19,6 +19,7 @@ MEDICAL_PRODUCTS = {"ENCASH"}
 TERM_PRODUCTS = {"PLT1", "PLT5", "PLT10", "PLT20", "CIT2"}
 
 import io
+import math
 import re
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -918,8 +919,92 @@ def _save(prs):
     return buf
 
 
-def build_pptx(data, rate=6.8):
+# ---------- 单利/复利：与 junrong-team calculators/compound.html 同口径 ----------
+def _irr_cf(cf):
+    """年末现金流求 IRR（二分法，区间 -99%~100%，无解扩到 500%）。"""
+    def npv(x):
+        s = 0.0
+        for t, c in enumerate(cf):
+            s += c / ((1.0 + x) ** t)
+        return s
+    low, high = -0.99, 1.0
+    nl, nh = npv(low), npv(high)
+    if nl * nh > 0:
+        high = 5.0
+        nh = npv(high)
+        if nl * nh > 0:
+            return None
+    for _ in range(120):
+        mid = (low + high) / 2.0
+        nm = npv(mid)
+        if abs(nm) < 1e-7:
+            return mid
+        if nm * nl < 0:
+            high = mid
+            nh = nm
+        else:
+            low = mid
+            nl = nm
+    return (low + high) / 2.0
+
+
+def _round1(x):
+    """与 JS Math.round(x*1000)/10 一致（.5 向正无穷）。"""
+    return math.floor(x * 10 + 0.5) / 10
+
+
+def apply_discount(data, discount):
+    """按「保费折扣/保费回赠」重算 rows 的单利/复利（口径同单复利计算器）。
+    折扣：每年保费 ×（1-r）；回赠：一次性回赠额＝年缴×r，抵扣第2年保费。
+    单利＝(退保−实际总保费)/实际总保费/加权平均年限；复利＝IRR。
+    """
+    if not data or not discount:
+        return data
+    mode = (discount.get("mode") or "none").strip()
+    try:
+        pct = float(discount.get("rate") or 0)
+    except (TypeError, ValueError):
+        pct = 0.0
+    if mode not in ("discount", "rebate") or pct <= 0:
+        return data
+    b = data.get("basic") or {}
+    annual = b.get("annual_premium")
+    try:
+        pay = int(b.get("pay_years") or 1)
+    except (TypeError, ValueError):
+        pay = 1
+    if not annual or pay <= 0:
+        return data
+    r = pct / 100.0
+    prem = [float(annual)] * pay
+    if mode == "discount":
+        prem = [float(annual) * (1 - r)] * pay
+    elif pay >= 2:
+        prem[1] = max(0.0, float(annual) - float(annual) * r)
+    total = sum(prem)
+    if total <= 0:
+        return data
+    for row in (data.get("rows") or []):
+        s = row.get("surrender")
+        yr = row.get("year") or 1
+        if not s or not yr:
+            continue
+        weighted = sum(p * (yr - k) for k, p in enumerate(prem))
+        avg = weighted / total
+        simple = _round1((s - total) / total / avg * 100) if avg > 0 else None
+        cf = [0.0] * (max(yr, pay - 1) + 1)
+        for k in range(pay):
+            cf[k] -= prem[k]
+        cf[yr] += s
+        irr = _irr_cf(cf)
+        row["simple_pct"] = simple
+        row["compound_pct"] = None if irr is None else _round1(irr * 100)
+    return data
+
+
+def build_pptx(data, rate=6.8, discount=None):
     """单份：基础表 + 提取页（CIM3/CIE3 / ENCASH 走专属页）。"""
+    data = apply_discount(data, discount)
     prs, blank = _new_prs()
     if data.get("product_code") in CRITICAL_PRODUCTS:
         add_cim3_slides(prs, blank, data, rate)
@@ -933,12 +1018,13 @@ def build_pptx(data, rate=6.8):
     return _save(prs)
 
 
-def build_combined_pptx(base, variants, rate=6.8):
+def build_combined_pptx(base, variants, rate=6.8, discount=None):
     """同一投入方案多提取方案：基础表一次，每个提取方案各一页。"""
     cn = "一二三四五六七八九十"
     prs, blank = _new_prs()
+    base = apply_discount(base, discount)
     add_base_slides(prs, blank, base, rate)
     for i, v in enumerate(variants):
         label = cn[i] if i < len(cn) else str(i + 1)
-        add_withdrawal_slide(prs, blank, v, rate, label=label)
+        add_withdrawal_slide(prs, blank, apply_discount(v, discount), rate, label=label)
     return _save(prs)

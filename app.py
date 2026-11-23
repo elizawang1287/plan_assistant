@@ -166,7 +166,8 @@ async def parse_plan(file: UploadFile = File(...)):
 async def export_ppt(payload: dict = None):
     try:
         rate = float((payload or {}).get("rate", 6.8))
-        buf = ppt_export.build_pptx(payload, rate)
+        discount = (payload or {}).get("discount") or None
+        buf = ppt_export.build_pptx(payload, rate, discount=discount)
         # 生成文件名：产品+年龄+性别+保额
         b = (payload or {}).get("basic", {}) or {}
         age = b.get("anb_age", "")
@@ -191,13 +192,14 @@ async def export_ppt(payload: dict = None):
 async def export_combined(payload: dict = None):
     try:
         rate = float((payload or {}).get("rate", 6.8))
+        discount = (payload or {}).get("discount") or None
         cl = payload.get("curLabel", "人民币")
         base = payload["base"]
         variants = payload.get("variants", []) or [base]
         base["curLabel"] = cl
         for v in variants:
             v["curLabel"] = cl
-        buf = ppt_export.build_combined_pptx(base, variants, rate)
+        buf = ppt_export.build_combined_pptx(base, variants, rate, discount=discount)
         # 生成文件名：产品+年龄+性别+保额
         b = base.get("basic", {}) or {}
         age = b.get("anb_age", "")
