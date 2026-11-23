@@ -323,8 +323,10 @@ def add_base_slides(prs, blank, data, rate=6.8):
         _box(slide, "（投资回报比现时预期每年上升约 1.4%）", 0.52, 0.72, 7.22, size=16, color=DARK, align=PP_ALIGN.CENTER)
         opt_rows = []
         for r in rows:
-            s = f"{float(r['simple_pct']):.2f}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
-            c = f"{float(r['compound_pct']):.2f}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
+            os_ = r.get("opt_simple_pct")
+            oc = r.get("opt_compound_pct")
+            s = f"{float(os_):.2f}%" if (os_ is not None and os_ > 0) else "/"
+            c = f"{float(oc):.2f}%" if (oc is not None and oc > 0) else "/"
             opt_rows.append([ylab(r), _wan(opt_of(r)), _rmb(opt_of(r), rate), s, c])
         _build_table(slide, 1.14, [["保单年度", f"退保价值（{_cur_code(cur)}）", f"退保价值（{_cur_code(cl)}）", "单利%/年", "复利%/年"]], opt_rows,
                      col_w=[1.6, 1.8, 1.6, 1.1, 1.1], row_h=0.45, hdr_size=18, data_size=14, red_cols=[2],
@@ -958,51 +960,76 @@ _round1 = _round2
 
 
 def apply_discount(data, discount):
-    """按「保费折扣/保费回赠」重算 rows 的单利/复利（口径同单复利计算器）。
+    """按「保费折扣/保费回赠」重算单利/复利（口径同单复利计算器；正常与乐观情景都重算）。
     折扣：每年保费 ×（1-r）；回赠：一次性回赠额＝年缴×r，抵扣第2年保费。
     单利＝(退保−实际总保费)/实际总保费/加权平均年限；复利＝IRR。
     """
-    if not data or not discount:
+    if not data:
         return data
-    mode = (discount.get("mode") or "none").strip()
+    mode = ((discount or {}).get("mode") or "none").strip()
     try:
-        pct = float(discount.get("rate") or 0)
+        pct = float((discount or {}).get("rate") or 0)
     except (TypeError, ValueError):
         pct = 0.0
     if mode not in ("discount", "rebate") or pct <= 0:
-        return data
-    b = data.get("basic") or {}
-    annual = b.get("annual_premium")
+        return recalc_pcts(data, None)
+    return recalc_pcts(data, {"mode": mode, "rate": pct})
+
+
+def _prem_list(basic, discount=None):
+    """按缴费期生成每年实际保费（含折扣/回赠）。"""
+    annual = basic.get("annual_premium")
     try:
-        pay = int(b.get("pay_years") or 1)
+        pay = int(basic.get("pay_years") or 1)
     except (TypeError, ValueError):
         pay = 1
-    if not annual or pay <= 0:
-        return data
-    r = pct / 100.0
+    if not annual or pay <= 0 or pay > 100:
+        return None
     prem = [float(annual)] * pay
-    if mode == "discount":
-        prem = [float(annual) * (1 - r)] * pay
-    elif pay >= 2:
-        prem[1] = max(0.0, float(annual) - float(annual) * r)
+    if discount:
+        r = float(discount.get("rate") or 0) / 100.0
+        if discount.get("mode") == "discount":
+            prem = [float(annual) * (1 - r)] * pay
+        elif pay >= 2:
+            prem[1] = max(0.0, float(annual) - float(annual) * r)
+    return prem
+
+
+def _pct_pair(s, prem, yr):
+    """单利/复利（同一 S、同一套实际保费）。"""
     total = sum(prem)
-    if total <= 0:
+    if total <= 0 or not yr:
+        return None, None
+    weighted = sum(p * (yr - k) for k, p in enumerate(prem))
+    avg = weighted / total
+    simple = _round2((s - total) / total / avg * 100) if avg > 0 else None
+    cf = [0.0] * (max(yr, len(prem) - 1) + 1)
+    for k, p in enumerate(prem):
+        cf[k] -= p
+    cf[yr] += s
+    irr = _irr_cf(cf)
+    return simple, (None if irr is None else _round2(irr * 100))
+
+
+def recalc_pcts(data, discount=None):
+    """按正常/乐观两种情景各自的退保价值，逐行重算单利/复利。"""
+    b = (data or {}).get("basic") or {}
+    prem = _prem_list(b, discount)
+    if not prem:
         return data
+    opt = data.get("optimistic") or {}
     for row in (data.get("rows") or []):
         s = row.get("surrender")
         yr = row.get("year") or 1
         if not s or not yr:
             continue
-        weighted = sum(p * (yr - k) for k, p in enumerate(prem))
-        avg = weighted / total
-        simple = _round1((s - total) / total / avg * 100) if avg > 0 else None
-        cf = [0.0] * (max(yr, pay - 1) + 1)
-        for k in range(pay):
-            cf[k] -= prem[k]
-        cf[yr] += s
-        irr = _irr_cf(cf)
-        row["simple_pct"] = simple
-        row["compound_pct"] = None if irr is None else _round1(irr * 100)
+        simple, comp = _pct_pair(float(s), prem, yr)
+        row["simple_pct"], row["compound_pct"] = simple, comp
+        ov = opt.get(yr) or opt.get(str(yr)) or {}
+        v = ov.get("optimistic") if isinstance(ov, dict) else None
+        if v:
+            os_, oc = _pct_pair(float(v), prem, yr)
+            row["opt_simple_pct"], row["opt_compound_pct"] = os_, oc
     return data
 
 
