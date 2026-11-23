@@ -992,6 +992,9 @@ def _prem_list(basic, discount=None):
             prem = [float(annual) * (1 - r)] * pay
         elif pay >= 2:
             prem[1] = max(0.0, float(annual) - float(annual) * r)
+        else:
+            # 趸缴/1年期：回赠只能抵扣唯一一期，效果同折扣
+            prem[0] = max(0.0, float(annual) - float(annual) * r)
     return prem
 
 

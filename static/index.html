@@ -376,7 +376,7 @@ function render(data, fname){
             <option value="rebate">保费回赠（第2年保费抵扣）</option>
           </select>
           <input type="number" id="discountPct" value="0" min="0" max="100" step="0.1" style="width:64px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:16px">
-          <span style="font-size:12px;color:var(--gray)">%（折扣＝每年保费×比例；回赠＝一次性回赠额抵扣第2年保费，口径同单复利计算器）</span>
+          <span style="font-size:12px;color:var(--gray)">%（折扣＝每年保费×比例；回赠＝回赠额抵扣第2年保费；趸缴/1年期回赠即抵扣唯一一期，与折扣同结果）</span>
         </td></tr>`;
 
   // 读优惠设置（与 junrong-team 单复利计算器 calculators/compound.html 同口径）
@@ -417,8 +417,9 @@ function render(data, fname){
     for (let k = 0; k < payYears; k++) prem.push(annual);
     if (rate > 0 && mode === 'discount') {
       for (let k = 0; k < payYears; k++) prem[k] = annual * (1 - rate);
-    } else if (rate > 0 && mode === 'rebate' && payYears >= 2) {
-      prem[1] = Math.max(0, annual - annual * rate);
+    } else if (rate > 0 && mode === 'rebate') {
+      if (payYears >= 2) prem[1] = Math.max(0, annual - annual * rate);
+      else prem[0] = Math.max(0, annual - annual * rate);  // 趸缴/1年期：回赠只能抵扣唯一一期，效果同折扣
     }
     const T = prem.reduce((a, x) => a + x, 0);
     if (!T) return { simple: null, compound: null };
