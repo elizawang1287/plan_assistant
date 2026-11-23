@@ -449,20 +449,26 @@ function render(data, fname){
   };
   const normalHtml = renderNormalTable({ mode: 'none', rate: 0 });
 
+  // 乐观预期退保价值表行（口径与正常预期表一致：同一 calcActualPct + 同一悬浮提示）
+  const renderOptTable = (opts) => {
+    return rows.map(r=>{
+      const o = data.optimistic[r.year];
+      const optVal = o ? o.optimistic : r.surrender;  // 25年后两情景趋同，取正常价值
+      const { simple, compound } = calcActualPct(Object.assign({}, r, { surrender: optVal }), opts);
+      return `<tr${rowCls(r)}><td>${ylab(r)}</td><td${preciseTip(optVal, cur)}>${wU(optVal)}</td><td${preciseTip(optVal == null ? null : Math.round(optVal * rate), curLabel)}>${wR(optVal)}</td><td>${pctStr(simple)}</td><td>${pctStr(compound)}</td></tr>`;
+    }).join('');
+  };
+
   // 乐观预期退保价值表（仅 PRMESP 有）
   const hasOpt = data.optimistic && Object.keys(data.optimistic).length > 0;
   let optSection = '';
   if (hasOpt) {
-    const optHtml = rows.map(r=>{
-      const o = data.optimistic[r.year];
-      const optVal = o ? o.optimistic : r.surrender;  // 25年后两情景趋同，取正常价值
-      return `<tr${rowCls(r)}><td>${ylab(r)}</td><td>${wU(optVal)}</td><td>${wR(optVal)}</td></tr>`;
-    }).join('');
+    const optHtml = renderOptTable({ mode: 'none', rate: 0 });
     optSection = `
     <div class="sec">
       <div class="sec-title">退保价值（乐观预期）</div>
       <div class="w-small" style="margin-bottom:8px;">（投资回报比现时预期每年上升约1.2%；长远受每年6.5%客户总内部回报率规限，乐观与正常情景趋于一致）</div>
-      <table class="w-table"><tr><th>保单年度</th><th>退保价值（${cur === '美元' ? 'USD' : cur === '港币' ? 'HKD' : 'RMB'}）</th><th>退保价值（${curLabel === '人民币' ? 'RMB' : 'HKD'}）</th></tr>${optHtml}</table>
+      <table class="w-table" id="tblOpt"><tr><th>保单年度</th><th>退保价值（${cur === '美元' ? 'USD' : cur === '港币' ? 'HKD' : 'RMB'}）</th><th>退保价值（${curLabel === '人民币' ? 'RMB' : 'HKD'}）</th><th>单利%/年</th><th>复利%/年</th></tr>${optHtml}</table>
     </div>`;
   }
 
@@ -607,7 +613,7 @@ function render(data, fname){
     </div>
     <div class="sec">
       <div class="sec-title">退保价值（正常预期）</div>
-      <table class="w-table">
+      <table class="w-table" id="tblNormal">
         <tr><th>保单年度</th><th>退保价值（${cur === '美元' ? 'USD' : cur === '港币' ? 'HKD' : 'RMB'}）</th><th>退保价值（${curLabel === '人民币' ? 'RMB' : 'HKD'}）</th><th>单利%/年</th><th>复利%/年</th></tr>
         ${normalHtml}
       </table>
@@ -628,17 +634,19 @@ function render(data, fname){
   const discountModeEl = document.getElementById('discountMode');
   const refreshPct = () => {
     const opts = readDiscount();
-    const tables = card.querySelectorAll('table.w-table');
-    if (tables.length > 0) {
-      const table = tables[0]; // 第一个w-table是正常预期退保价值表
+    const fill = (table, html) => {
+      if (!table) return;
       const hdrRow = table.rows[0].cloneNode(true);
-      const newHtml = renderNormalTable(opts);
       table.innerHTML = '';
       table.appendChild(hdrRow);
       const tmpDiv = document.createElement('div');
-      tmpDiv.innerHTML = '<table><tbody>' + newHtml + '</tbody></table>';
+      tmpDiv.innerHTML = '<table><tbody>' + html + '</tbody></table>';
       tmpDiv.querySelectorAll('tr').forEach(tr => table.appendChild(tr));
-    }
+    };
+    const tNormal = document.getElementById('tblNormal');
+    const tOpt = document.getElementById('tblOpt');
+    fill(tNormal || card.querySelectorAll('table.w-table')[0], renderNormalTable(opts));
+    fill(tOpt, renderOptTable(opts));
   };
   if (discountInput) discountInput.oninput = refreshPct;
   if (discountModeEl) discountModeEl.onchange = refreshPct;
