@@ -439,10 +439,12 @@ function render(data, fname){
   // 正常预期退保价值表（PPT：年度|美元|人民币|单利|复利）
   const rowCls = r => r.is_age_marker ? ' class="age-row"' : (isBE(r) ? ' class="be-row"' : '');
   const pctStr = v => (v != null && v > 0) ? Number(v).toFixed(2)+'%' : '/';
+  const numExact = v => Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const preciseTip = (v, label) => (v != null && v !== '') ? ` title="精确值 ${numExact(v)} ${label}（单利/复利按此值计算）"` : '';
   const renderNormalTable = (opts) => {
     return rows.map(r=>{
       const { simple, compound } = calcActualPct(r, opts);
-      return `<tr${rowCls(r)}><td>${ylab(r)}</td><td>${wU(r.surrender)}</td><td>${wR(r.surrender)}</td><td>${pctStr(simple)}</td><td>${pctStr(compound)}</td></tr>`;
+      return `<tr${rowCls(r)}><td>${ylab(r)}</td><td${preciseTip(r.surrender, cur)}>${wU(r.surrender)}</td><td${preciseTip(r.surrender == null ? null : Math.round(r.surrender * rate), curLabel)}>${wR(r.surrender)}</td><td>${pctStr(simple)}</td><td>${pctStr(compound)}</td></tr>`;
     }).join('');
   };
   const normalHtml = renderNormalTable({ mode: 'none', rate: 0 });
