@@ -550,14 +550,14 @@ def compute_metrics(row, total_premium, annual_premium=None, pay_years=None):
         #   复利 = IRR（年初缴费、Y年退保）
         if annual_premium and pay_years and row["surrender"] > total_premium and yr > 0:
             avg_years = yr - (pay_years - 1) / 2.0
-            out["simple_pct"] = round((row["surrender"] - total_premium) / total_premium / avg_years * 100, 1)
+            out["simple_pct"] = round((row["surrender"] - total_premium) / total_premium / avg_years * 100, 2)
             irr = _irr(annual_premium, pay_years, row["surrender"], yr)
-            out["compound_pct"] = round(irr * 100, 1) if irr is not None else None
+            out["compound_pct"] = round(irr * 100, 2) if irr is not None else None
         else:
             # 回退旧口径（缺参数或前期无正回报）
-            out["simple_pct"] = round((row["surrender"] - total_premium) / total_premium / yr * 100, 1)
+            out["simple_pct"] = round((row["surrender"] - total_premium) / total_premium / yr * 100, 2)
             if row["surrender"] > 0 and yr > 0:
-                out["compound_pct"] = round(((row["surrender"] / total_premium) ** (1.0 / yr) - 1) * 100, 1)
+                out["compound_pct"] = round(((row["surrender"] / total_premium) ** (1.0 / yr) - 1) * 100, 2)
             else:
                 out["compound_pct"] = None
     return out

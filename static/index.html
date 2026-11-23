@@ -425,20 +425,20 @@ function render(data, fname){
     // 单利
     const weighted = prem.reduce((a, p, k) => a + p * (yr - k), 0);
     const avgYears = weighted / T;
-    const simple = avgYears > 0 ? Math.round((S - T) / T / avgYears * 1000) / 10 : null;
+    const simple = avgYears > 0 ? Math.round((S - T) / T / avgYears * 10000) / 100 : null;
     // 复利（IRR）：t=k-1 为第 k 年年初缴费；t=Y 为退保拿钱
     const len = Math.max(yr, payYears - 1) + 1;
     const cf = new Array(len).fill(0);
     for (let k = 0; k < payYears; k++) cf[k] -= prem[k]; // 第 k+1 年年初缴费 → t=k
     cf[yr] += S;
     const rate2 = irrOf(cf);
-    const compound = rate2 == null ? null : Math.round(rate2 * 1000) / 10;
+    const compound = rate2 == null ? null : Math.round(rate2 * 10000) / 100;
     return { simple, compound };
   };
 
   // 正常预期退保价值表（PPT：年度|美元|人民币|单利|复利）
   const rowCls = r => r.is_age_marker ? ' class="age-row"' : (isBE(r) ? ' class="be-row"' : '');
-  const pctStr = v => (v != null && v > 0) ? v+'%' : '/';
+  const pctStr = v => (v != null && v > 0) ? Number(v).toFixed(2)+'%' : '/';
   const renderNormalTable = (opts) => {
     return rows.map(r=>{
       const { simple, compound } = calcActualPct(r, opts);
@@ -736,8 +736,8 @@ function renderCIM3(data, fname){
       <td>${wU(r.surrender)}</td>
     </tr>`).join(''));
   const srHtml = rows.map(r => {
-    const s = (r.simple_pct != null && r.simple_pct > 0) ? (r.simple_pct+'%') : '/';
-    const c = (r.compound_pct != null && r.compound_pct > 0) ? (r.compound_pct+'%') : '/';
+    const s = (r.simple_pct != null && r.simple_pct > 0) ? (Number(r.simple_pct).toFixed(2)+'%') : '/';
+    const c = (r.compound_pct != null && r.compound_pct > 0) ? (Number(r.compound_pct).toFixed(2)+'%') : '/';
     return `<tr${rowCls(r)}>
       <td>${ylab(r)}</td>
       <td>${wU(r.paid)}</td>
@@ -919,8 +919,8 @@ function renderENCASH(data, fname){
       <td>${fmtW(r.surrender)}</td>
     </tr>`).join('');
   const srHtml = rows.map(r => {
-    const s = (r.simple_pct != null && r.simple_pct > 0) ? (r.simple_pct+'%') : '/';
-    const c = (r.compound_pct != null && r.compound_pct > 0) ? (r.compound_pct+'%') : '/';
+    const s = (r.simple_pct != null && r.simple_pct > 0) ? (Number(r.simple_pct).toFixed(2)+'%') : '/';
+    const c = (r.compound_pct != null && r.compound_pct > 0) ? (Number(r.compound_pct).toFixed(2)+'%') : '/';
     return `<tr${rowCls(r)}>
       <td>${ylab(r)}</td>
       <td>${wU(r.paid)}</td>

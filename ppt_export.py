@@ -303,8 +303,8 @@ def add_base_slides(prs, blank, data, rate=6.8):
     _box(slide, "退保价值", 0.52, 1.60, 7.22, size=20, bold=True, color=DARK, align=PP_ALIGN.CENTER)
     normal_rows = []
     for r in rows:
-        s = f"{r['simple_pct']}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
-        c = f"{r['compound_pct']}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
+        s = f"{float(r['simple_pct']):.2f}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
+        c = f"{float(r['compound_pct']):.2f}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
         normal_rows.append([ylab(r), _wan(r["surrender"]), _rmb(r["surrender"], rate), s, c])
     _build_table(slide, 2.05, [["保单年度", f"退保价值（{_cur_code(cur)}）", f"退保价值（{_cur_code(cl)}）", "单利%/年", "复利%/年"]], normal_rows,
                  col_w=[1.6, 1.8, 1.6, 1.1, 1.1], row_h=0.42, hdr_size=18, data_size=14, red_cols=[2],
@@ -323,8 +323,8 @@ def add_base_slides(prs, blank, data, rate=6.8):
         _box(slide, "（投资回报比现时预期每年上升约 1.4%）", 0.52, 0.72, 7.22, size=16, color=DARK, align=PP_ALIGN.CENTER)
         opt_rows = []
         for r in rows:
-            s = f"{r['simple_pct']}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
-            c = f"{r['compound_pct']}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
+            s = f"{float(r['simple_pct']):.2f}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
+            c = f"{float(r['compound_pct']):.2f}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
             opt_rows.append([ylab(r), _wan(opt_of(r)), _rmb(opt_of(r), rate), s, c])
         _build_table(slide, 1.14, [["保单年度", f"退保价值（{_cur_code(cur)}）", f"退保价值（{_cur_code(cl)}）", "单利%/年", "复利%/年"]], opt_rows,
                      col_w=[1.6, 1.8, 1.6, 1.1, 1.1], row_h=0.45, hdr_size=18, data_size=14, red_cols=[2],
@@ -450,8 +450,8 @@ def add_cim3_slides(prs, blank, data, rate=6.8):
          0.52, 0.72, 7.22, size=12, color=GRAY, align=PP_ALIGN.CENTER)
     sr_rows = []
     for r in rows:
-        s = f"{r['simple_pct']}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
-        c = f"{r['compound_pct']}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
+        s = f"{float(r['simple_pct']):.2f}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
+        c = f"{float(r['compound_pct']):.2f}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
         sr_rows.append([ylab(r), _wan(r["paid"]), _wan(r["death_total"]),
                         _wan(r["surrender"]), _rmb(r["surrender"], rate), s, c])
     _build_table(slide, 1.25,
@@ -654,8 +654,8 @@ def add_encash_slides(prs, blank, data, rate=6.8):
          0.52, 0.72, 7.22, size=12, color=GRAY, align=PP_ALIGN.CENTER)
     sr_rows = []
     for r in rows:
-        s = f"{r['simple_pct']}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
-        c = f"{r['compound_pct']}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
+        s = f"{float(r['simple_pct']):.2f}%" if (r.get("simple_pct") is not None and r["simple_pct"] > 0) else "/"
+        c = f"{float(r['compound_pct']):.2f}%" if (r.get("compound_pct") is not None and r["compound_pct"] > 0) else "/"
         sr_rows.append([ylab(r), _wan(r["paid"]), _wan(r["death_total"]),
                         _wan(r["surrender"]), _rmb(r["surrender"], rate), s, c])
     _build_table(slide, 1.25,
@@ -948,9 +948,13 @@ def _irr_cf(cf):
     return (low + high) / 2.0
 
 
-def _round1(x):
-    """与 JS Math.round(x*1000)/10 一致（.5 向正无穷）。"""
-    return math.floor(x * 10 + 0.5) / 10
+def _round2(x):
+    """与 JS Math.round(x*10000)/100 一致（两位小数，.5 向正无穷）。"""
+    return math.floor(x * 100 + 0.5) / 100
+
+
+# 兼容旧名
+_round1 = _round2
 
 
 def apply_discount(data, discount):
